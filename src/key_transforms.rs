@@ -115,11 +115,36 @@ pub struct Mapper {
   state: State
 }
 
-pub fn make_mapper(layout: Layout) -> Mapper {
-  return Mapper {
-    layout: make_hashed_layout(layout),
-    state: init_state()
-  };
+impl Mapper {
+  pub fn for_layout(layout: Layout) -> Mapper {
+    Mapper {
+      layout: make_hashed_layout(layout),
+      state: init_state()
+    }
+  }
+  
+  pub fn step(self: &mut Mapper, input: Event) -> Vec<Event> {
+    let state = &mut self.state;
+
+    match input {
+      Pressed(k) => {
+        if !state.input_pressed_keys.contains(&k) {
+          return newly_press(self, k);
+        }
+        else {
+          return vec![];
+        }
+      },
+      Released(k) => {
+        if state.input_pressed_keys.contains(&k) {
+          return newly_release(self, k);
+        }
+        else {
+          return vec![];
+        }
+      },
+    }
+  }
 }
 
 fn add_new_mapping(state: &mut State, m: &Mapping) -> Vec<Event> {
@@ -281,28 +306,5 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> Vec<Event> {
   });
   
   return res;
-}
-
-pub fn step(mapper: &mut Mapper, input: Event) -> Vec<Event> {
-  let state = &mut mapper.state;
-
-  match input {
-    Pressed(k) => {
-      if !state.input_pressed_keys.contains(&k) {
-        return newly_press(mapper, k);
-      }
-      else {
-        return vec![];
-      }
-    },
-    Released(k) => {
-      if state.input_pressed_keys.contains(&k) {
-        return newly_release(mapper, k);
-      }
-      else {
-        return vec![];
-      }
-    },
-  }
 }
 

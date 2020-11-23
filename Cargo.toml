@@ -16,4 +16,6 @@ serde = { version = "1.0.117", features = ["derive"] }
 libc = "0.2.80"
 cast = "0.2.3"
 uinput-sys = "0.1.7"
+num-traits = "0.2"
+num-derive = "0.3"
 

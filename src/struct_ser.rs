@@ -36,7 +36,7 @@ impl StructSerializer {
     }
   }
   
-  pub fn add_i32(self: &mut StructSerializer, x: u32) {
+  pub fn add_i32(self: &mut StructSerializer, x: i32) {
     for b in &x.to_ne_bytes() {
       self.sink.push(*b);
     }

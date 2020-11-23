@@ -1,8 +1,9 @@
 
 use serde::{Deserialize, Serialize};
 use enum_utils::FromStr;
+use num_derive::FromPrimitive;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, FromStr, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, FromStr, Serialize, Deserialize, FromPrimitive)]
 #[allow(non_camel_case_types)]
 pub enum KeyCode {
   ESC = 1,
