@@ -13,11 +13,12 @@ impl StructSerializer {
       self.sink.push(text_bytes[i]);
     }
     
-    for i in 0 .. (buff_size - text_bytes.len()) {
+    for _i in 0 .. (buff_size - text_bytes.len()) {
       self.sink.push(0);
     }
   }
   
+  #[allow(dead_code)]
   pub fn add_u8(self: &mut StructSerializer, x: u8) {
     for b in &x.to_ne_bytes() {
       self.sink.push(*b);
@@ -42,6 +43,7 @@ impl StructSerializer {
     }
   }
   
+  #[allow(dead_code)]
   pub fn add_u64(self: &mut StructSerializer, x: u64) {
     for b in &x.to_ne_bytes() {
       self.sink.push(*b);

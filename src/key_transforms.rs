@@ -73,8 +73,8 @@ fn mapping_priority(m1: &Mapping, m2: &Mapping) -> Ordering {
   return trigger_priority(&m1.from, &m2.from);
 }
 
-fn make_hashed_layout(layout: Layout) -> HashedLayout {
-  let mut mappings = HashMap::new();
+fn make_hashed_layout(layout: &Layout) -> HashedLayout {
+  let mut mappings: HashMap<KeyCode, Vec<Mapping>> = HashMap::new();
 
   for mapping in &layout.0 {
     for i in 0 .. mapping.from.len() {
@@ -94,14 +94,14 @@ fn make_hashed_layout(layout: Layout) -> HashedLayout {
     }
   }
   
-  for mapping in layout.0 {
+  for mapping in &layout.0 {
     let last = final_key(&mapping.from);
     match mappings.get_mut(&last) {
       None => {
-        mappings.insert(last, vec![mapping]);
+        mappings.insert(last, vec![mapping.clone()]);
       },
       Some(existing) => {
-        existing.push(mapping);
+        existing.push(mapping.clone());
         existing.sort_by(mapping_priority);
       }
     }
@@ -116,7 +116,7 @@ pub struct Mapper {
 }
 
 impl Mapper {
-  pub fn for_layout(layout: Layout) -> Mapper {
+  pub fn for_layout(layout: &Layout) -> Mapper {
     Mapper {
       layout: make_hashed_layout(layout),
       state: init_state()
