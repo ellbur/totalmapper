@@ -8,6 +8,13 @@ use nix::errno::Errno::ENODEV;
 use crate::dev_input_rw;
 use crate::key_transforms;
 
+pub fn do_remapping_loop_all_devices() -> Result<(), Error> {
+  do_remapping_loop_multiple_devices()
+}
+
+pub fn do_remapping_loop_multiple_devices(devices: &[&str]) -> Result<(), Error> {
+}
+
 pub fn do_remapping_loop(device_path: String, layout: &Layout) -> Result<(), Error> {
   let mut r = dev_input_rw::DevInputReader::open(&device_path, true)?;
   let mut w = dev_input_rw::DevInputWriter::open()?;

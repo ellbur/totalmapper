@@ -7,15 +7,25 @@ use num_derive::FromPrimitive;
 #[allow(non_camel_case_types)]
 pub enum KeyCode {
   ESC = 1,
+  #[serde(rename = "1")]
   K1 = 2,
+  #[serde(rename = "2")]
   K2 = 3,
+  #[serde(rename = "3")]
   K3 = 4,
+  #[serde(rename = "4")]
   K4 = 5,
+  #[serde(rename = "5")]
   K5 = 6,
+  #[serde(rename = "6")]
   K6 = 7,
+  #[serde(rename = "7")]
   K7 = 8,
+  #[serde(rename = "8")]
   K8 = 9,
+  #[serde(rename = "9")]
   K9 = 10,
+  #[serde(rename = "0")]
   K0 = 11,
   MINUS = 12,
   EQUAL = 13,
