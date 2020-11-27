@@ -19,6 +19,6 @@ pub struct Mapping {
   pub to: Vec<KeyCode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Layout(pub Vec<Mapping>);
 

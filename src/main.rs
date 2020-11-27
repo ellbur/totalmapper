@@ -16,6 +16,7 @@ mod udev_utils;
 mod layout_loading;
 
 use clap::{Arg, App};
+use std::borrow::Cow;
 
 fn main() {
   let mut app =
@@ -151,18 +152,45 @@ fn main() {
           (Some(name), None) => {
             match (*default_layouts::DEFAULT_LAYOUTS).get(name) {
               None => Err(format!("Error: no builtin layout named {}", name)),
-              Some(layout) => Ok(**layout)
+              Some(layout) => Ok(Cow::Borrowed(*layout))
             }
           },
           (None, Some(path)) => {
-            layout_loading::load_layout_from_file(path)
+            match layout_loading::load_layout_from_file(path) {
+              Err(err) => Err(err),
+              Ok(layout) => Ok(Cow::Owned(layout))
+            }
           }
         };
       
       match layout {
         Err(msg) => println!("{}", msg),
         Ok(layout) => {
-          
+          match (m.occurrences_of("all_keyboards") > 0, m.values_of("dev_file")) {
+            (false, None) => {
+              println!("Error: Must specify a least one --dev-file or --all-keyboards");
+            },
+            (true, Some(_)) => {
+              println!("Error: Must specify either --dev-file or --all-keyboards, not both");
+            },
+            (true, None) => {
+              match remapping_loop::do_remapping_loop_all_devices(&layout) {
+                Ok(_) => (),
+                Err(err) => {
+                  println!("Error: {}", err);
+                }
+              }
+            },
+            (false, Some(devs)) => {
+              let devs2 = devs.collect();
+              match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout) {
+                Ok(_) => (),
+                Err(err) => {
+                  println!("Error: {}", err);
+                }
+              }
+            }
+          }
         }
       }
     }).unwrap();
@@ -186,7 +214,13 @@ fn main() {
       }
     }
   }
-  else if let Some(_) = m.subcommand_matches("add_udev_rule") {
+  else if let Some(m) = m.subcommand_matches("add_udev_rule") {
+    match udev_utils::add_udev_rule(m.value_of("default_layout"), m.value_of("layout_file")) {
+      Err(msg) => {
+        println!("{}", msg);
+      },
+      Ok(_) => ()
+    }
   }
   else if let Some(m) = m.subcommand_matches("print_udev_rule") {
     match udev_utils::udev_rule(m.value_of("default_layout"), m.value_of("layout_file")) {

@@ -8,11 +8,13 @@ use nix::errno::Errno::ENODEV;
 use crate::dev_input_rw;
 use crate::key_transforms;
 
-pub fn do_remapping_loop_all_devices() -> Result<(), Error> {
-  do_remapping_loop_multiple_devices()
+pub fn do_remapping_loop_all_devices(layout: &Layout) -> Result<(), Error> {
+  //do_remapping_loop_multiple_devices()
+  Ok(())
 }
 
-pub fn do_remapping_loop_multiple_devices(devices: &[&str]) -> Result<(), Error> {
+pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard: bool, layout: &Layout) -> Result<(), Error> {
+  Ok(())
 }
 
 pub fn do_remapping_loop(device_path: String, layout: &Layout) -> Result<(), Error> {
