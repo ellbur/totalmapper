@@ -141,6 +141,8 @@ fn main() {
         }
       };
       
+      println!("Starting remapping.");
+      
       let layout =
         match (m.value_of("default_layout"), m.value_of("layout_file")) {
           (None, None) => {

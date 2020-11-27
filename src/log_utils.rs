@@ -42,6 +42,8 @@ pub fn open_log_file_and_delete_stale() -> io::Result<Logging> {
       .open(err_log_path)?;
     let err_redirect = Redirect::stderr(err_log_file)?;
     
+    println!("Writing redirected log output.");
+    
     Ok(Logging::Redirected(out_redirect, err_redirect))
   }
 }
