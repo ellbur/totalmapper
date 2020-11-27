@@ -1,9 +1,10 @@
 
 // vim: shiftwidth=2
 
-use std::fs::File;
+use std::fs::{File, canonicalize};
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 
 pub fn list_keyboards_to_stdout() -> io::Result<()> {
   for p in list_keyboards()? {
@@ -92,5 +93,37 @@ fn dev_path_for_sysfs_name(sysfs_name: &String) -> io::Result<Option<PathBuf>> {
   }
   
   Ok(None)
+}
+
+pub fn filter_keyboards<'a>(devices: &Vec<&'a str>) -> io::Result<Vec<&'a str>> {
+  let mut res = Vec::new();
+  
+  let all_keyboards = list_keyboards()?;
+  let mut canonical_set: HashSet<String> = HashSet::new();
+  for p in all_keyboards {
+    for q in canonicalize(p) {
+      for s in q.to_str() {
+        canonical_set.insert(s.to_string());
+      }
+    }
+  }
+  
+  for s in devices {
+    match canonicalize(Path::new(s)) {
+      Err(_) => (),
+      Ok(c) => {
+        match c.to_str() {
+          None => (),
+          Some(l) => {
+            if canonical_set.contains(&l.to_string()) {
+              res.push(*s)
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  Ok(res)
 }
 
