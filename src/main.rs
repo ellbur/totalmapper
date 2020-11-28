@@ -12,6 +12,7 @@ mod layout_generation;
 mod keyboard_listing;
 mod udev_utils;
 mod layout_loading;
+mod version;
 
 use clap::{Arg, App};
 use std::borrow::Cow;
@@ -19,10 +20,20 @@ use keys::Layout;
 
 fn main() {
   let mut app =
-    App::new("The TotalMapper keyboard remapping tool")
-      .version("1.0")
+    App::new("totalmapper")
+      .version(version::VERSION)
       .author("Owen Healy <owen@owenehealy.com>")
-      .about("Remaps keycodes in the Linux input event system based on a JSON-defined list of mappings")
+      .about("Remaps keycodes in the Linux input event system based on a simple, JSON-defined list of mappings.\n\
+        \n\
+        To try mapping your keyboard, run:\n\
+        \n\
+            totalmapper remap --default-layout caps-for-movement --all-keyboards\n\
+        \n\
+        (making sure you have write access to /dev/uinput).\n\
+        \n\
+        To see an example of how to define mappings, run:\n\
+        \n\
+            totalmapper print_default_layout caps-for-movement")
       .subcommand(App::new("remap")
         .about("Remap a keyboard")
         .arg(Arg::new("dev_file")

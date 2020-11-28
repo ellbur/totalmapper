@@ -1,0 +1,52 @@
+#!/usr/bin/rakudo
+
+# vim: ft=perl6
+
+use FindBin;
+
+my $here = Bin();
+my $deb_building_dir = $here.add('deb-building');
+my $tree_root = $deb_building_dir.add('totalmapper');
+my $control_file = $tree_root.add('DEBIAN/control');
+
+my $version_file = $here.add('version');
+my $version = (slurp $version_file).trim;
+
+my $version_rs_file = $here.add('src/version.rs');
+my $version_rs_fh = open $version_rs_file, :w;
+$version_rs_fh.print: "pub const VERSION: &str = \"$version\";\n";
+$version_rs_fh.close;
+
+run <cargo build --release>, cwd => $here;
+
+my $installed_size_text = (run <du -s>, $tree_root, :out).out.slurp(:close);
+unless ($installed_size_text.match: /\s*(\d+)<|w>.*/) { die("Didn't match") }
+my $installed_size = $0;
+
+my $exe_source = $here.add('target/release/totalmapper');
+my $exe_sink = $tree_root.add('usr/bin/totalmapper');
+$exe_source.copy: $exe_sink;
+
+my $control_content = qq:to/END/;
+Package: totalmapper
+Version: $version
+Section: custom
+Priority: optional
+Architecture: amd64
+Essential: no
+Installed-Size: $installed_size
+Maintainer: owen\@owenehealy.com
+Description: The totalmapper keyboard layout mapper
+END
+
+$control_file.parent.mkdir;
+my $control_fh = open $control_file, :w;
+$control_fh.print($control_content);
+$control_fh.close;
+
+run <dpkg-deb --build totalmapper>, cwd => $deb_building_dir;
+
+my $deb_source_file = $deb_building_dir.add('totalmapper.deb');
+my $deb_sink_file = $deb_building_dir.add("totalmapper_$version.deb");
+$deb_source_file.move($deb_sink_file);
+
