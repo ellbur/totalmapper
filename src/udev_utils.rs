@@ -101,6 +101,8 @@ pub fn write_systemd_service() -> Result<(), String> {
     \n\
     [Service]\n\
     Type=simple\n\
+    User=nobody\n\
+    Group=input\n\
     ExecStart=/usr/bin/totalmapper remap --layout-file /etc/totalmapper.json --only-if-keyboard --dev-file /%I\n".as_bytes()
   ) {
     Err(err) => return Err(format!("{}", err)),
