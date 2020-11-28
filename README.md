@@ -44,7 +44,7 @@ Define your own layout (see below) and remap your keyboard with:
 
 # Defining layouts
 
-Layouts are defined with a simle JSON syntax:
+Layouts are defined with a simple JSON syntax:
 
     [
       { "from": [ "CAPSLOCK" ], "to": [] },
