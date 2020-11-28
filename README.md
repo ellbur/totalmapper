@@ -16,7 +16,7 @@ With [`cargo`](https://doc.rust-lang.org/cargo/):
 
 ## Packages
 
-* Ubuntu: [`totalmapper_1.0.deb`]()
+* Ubuntu: [`totalmapper_1.0.deb`](https://github.com/ellbur/totalmapper/releases/download/1.0/totalmapper_1.0.deb)
 
 # Running
 
