@@ -10,13 +10,12 @@ mod default_layouts;
 mod remapping_loop;
 mod layout_generation;
 mod keyboard_listing;
-mod fork_utils;
-mod log_utils;
 mod udev_utils;
 mod layout_loading;
 
 use clap::{Arg, App};
 use std::borrow::Cow;
+use keys::Layout;
 
 fn main() {
   let mut app =
@@ -54,20 +53,10 @@ fn main() {
           .help_heading(Some("LAYOUT SELECTION"))
           .about("Load a layout from json file FILE. To see an example of the form, print an example using `totalmapper print_default_layout caps-for-movement`.")
         )
-        .arg(Arg::new("fork")
-          .long("fork")
-          .help_heading(Some("PROCESS"))
-          .about("Fork a detached child process and immediately return control. This is needed when invoked from a udev rule since commands invoked from a udev rule must exit quickly. Implies --log.")
-        )
         .arg(Arg::new("only_if_keyboard")
           .long("only-if-keyboard")
           .help_heading(Some("PROCESS"))
           .about("If the device selected with --dev-file is not a keyboard, exit successfully. Useful when running from udev, since there is no easy way to test in a udev rule whether an input device is a keyboard.")
-        )
-        .arg(Arg::new("log_to_file")
-          .long("log")
-          .help_heading(Some("PROCESS"))
-          .about("Send messages to /var/log/totalmapper/ instead of stdout and stderr. The directory must exist and be writable. If logging to the directory fails, there will be no logging.")
         )
       )
       .subcommand(App::new("list_keyboards")
@@ -84,25 +73,8 @@ fn main() {
           .about("The name of the builtin layout to print. Use `totalmapper list_default_layouts` to see the list of builtin layouts.")
         )
       )
-      .subcommand(App::new("add_udev_rule")
-        .about("Add (or update, if one exists) a rule in /etc/udev/rules.d/ to start totalmapper when a new keyboard is plugged in. Does not affect keyboards already plugged in. Must be run as root.")
-        .arg(Arg::new("default_layout")
-          .long("default-layout")
-          .takes_value(true)
-          .value_name("NAME")
-          .help_heading(Some("LAYOUT SELECTION"))
-          .about("Use the builtin layout named NAME. To list the builtin layouts, use `totalmapper list_default_layouts`. To get the JSON for a default layout, use `totalmapper print_default_layout <name>`.")
-        )
-        .arg(Arg::new("layout_file")
-          .long("layout-file")
-          .takes_value(true)
-          .value_name("FILE")
-          .help_heading(Some("LAYOUT SELECTION"))
-          .about("Load a layout from json file FILE. To see an example of the form, print an example using `totalmapper print_default_layout caps-for-movement`.")
-        )
-      )
-      .subcommand(App::new("print_udev_rule")
-        .about("Print the udev rule that would be added to /etc/udev/rules.d to start totalmapper when a new keyboard is plugged in.")
+      .subcommand(App::new("add_systemd_service")
+        .about("Add (or update, if one exists) a rule in /etc/udev/rules.d/ and service in /etc/systemd/system/ to start totalmapper when a new keyboard is plugged in. Does not affect keyboards already plugged in. Must be run as root.")
         .arg(Arg::new("default_layout")
           .long("default-layout")
           .takes_value(true)
@@ -122,80 +94,42 @@ fn main() {
   let m = app.clone().get_matches();
   
   if let Some(m) = m.subcommand_matches("remap") {
-    let fork = m.occurrences_of("fork") > 0;
-    let ignore_sig_hup = fork;
-    let log = fork || m.occurrences_of("log_to_file") > 0;
-    
-    fork_utils::fork_if_needed(fork, || {
-      if ignore_sig_hup {
-        unsafe {
-          libc::signal(libc::SIGHUP, libc::SIG_IGN);
-        }
-      }
-      let _log_redirection = {
-        if log {
-          Some(log_utils::open_log_file_and_delete_stale().unwrap())
-        }
-        else {
-          None
-        }
-      };
-      
-      println!("Starting remapping.");
-      
-      let layout =
-        match (m.value_of("default_layout"), m.value_of("layout_file")) {
-          (None, None) => {
-            Err("Error: no layout specified. Use --default-layout or --layout-file.".to_string())
+    let layout = load_layout(&m.value_of("default_layout"), &m.value_of("layout_file"));
+    match layout {
+      Err(msg) => {
+        println!("{}", msg);
+        std::process::exit(1);
+      },
+      Ok(layout) => {
+        match (m.occurrences_of("all_keyboards") > 0, m.values_of("dev_file")) {
+          (false, None) => {
+            println!("Error: Must specify a least one --dev-file or --all-keyboards");
           },
-          (Some(_), Some(_)) => {
-            Err("Error: use either --default-layout or --layout-file, not both.".to_string())
+          (true, Some(_)) => {
+            println!("Error: Must specify either --dev-file or --all-keyboards, not both");
           },
-          (Some(name), None) => {
-            match (*default_layouts::DEFAULT_LAYOUTS).get(name) {
-              None => Err(format!("Error: no builtin layout named {}", name)),
-              Some(layout) => Ok(Cow::Borrowed(*layout))
-            }
-          },
-          (None, Some(path)) => {
-            match layout_loading::load_layout_from_file(path) {
-              Err(err) => Err(err),
-              Ok(layout) => Ok(Cow::Owned(layout))
-            }
-          }
-        };
-      
-      match layout {
-        Err(msg) => println!("{}", msg),
-        Ok(layout) => {
-          match (m.occurrences_of("all_keyboards") > 0, m.values_of("dev_file")) {
-            (false, None) => {
-              println!("Error: Must specify a least one --dev-file or --all-keyboards");
-            },
-            (true, Some(_)) => {
-              println!("Error: Must specify either --dev-file or --all-keyboards, not both");
-            },
-            (true, None) => {
-              match remapping_loop::do_remapping_loop_all_devices(&layout) {
-                Ok(_) => (),
-                Err(err) => {
-                  println!("Error: {}", err);
-                }
+          (true, None) => {
+            match remapping_loop::do_remapping_loop_all_devices(&layout) {
+              Ok(_) => (),
+              Err(err) => {
+                println!("Error: {}", err);
+                std::process::exit(1);
               }
-            },
-            (false, Some(devs)) => {
-              let devs2 = devs.collect();
-              match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout) {
-                Ok(_) => (),
-                Err(err) => {
-                  println!("Error: {}", err);
-                }
+            }
+          },
+          (false, Some(devs)) => {
+            let devs2 = devs.collect();
+            match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout) {
+              Ok(_) => (),
+              Err(err) => {
+                println!("Error: {}", err);
+                std::process::exit(1);
               }
             }
           }
         }
       }
-    }).unwrap();
+    }
   }
   else if let Some(_) = m.subcommand_matches("list_keyboards") {
     keyboard_listing::list_keyboards_to_stdout().unwrap();
@@ -210,32 +144,55 @@ fn main() {
     match (*default_layouts::DEFAULT_LAYOUTS).get(name) {
       None => {
         println!("Error: no builtin layout named {}", name);
+        std::process::exit(1);
       },
       Some(layout) => {
         println!("{}", serde_json::to_string_pretty(layout).unwrap())
       }
     }
   }
-  else if let Some(m) = m.subcommand_matches("add_udev_rule") {
-    match udev_utils::add_udev_rule(m.value_of("default_layout"), m.value_of("layout_file")) {
-      Err(msg) => {
-        println!("{}", msg);
+  else if let Some(m) = m.subcommand_matches("add_systemd_service") {
+    match load_layout(&m.value_of("default_layout"), &m.value_of("layout_file")) {
+      Err(s) => {
+        println!("{}", s);
+        std::process::exit(1);
       },
-      Ok(_) => ()
-    }
-  }
-  else if let Some(m) = m.subcommand_matches("print_udev_rule") {
-    match udev_utils::udev_rule(m.value_of("default_layout"), m.value_of("layout_file")) {
-      Err(msg) => {
-        println!("{}", msg);
-      },
-      Ok(rule) => {
-        println!("{}", rule);
+      Ok(layout) => {
+        match udev_utils::add_systemd_service(&*layout) {
+          Err(msg) => {
+            println!("{}", msg);
+            std::process::exit(1);
+          },
+          Ok(_) => ()
+        }
       }
     }
   }
   else {
     app.print_long_help().unwrap();
+  }
+}
+
+fn load_layout(default_layout: &Option<&str>, layout_file: &Option<&str>) -> Result<Cow<'static, Layout>, String> {
+  match (default_layout, layout_file) {
+    (None, None) => {
+      Err("Error: no layout specified. Use --default-layout or --layout-file.".to_string())
+    },
+    (Some(_), Some(_)) => {
+      Err("Error: use either --default-layout or --layout-file, not both.".to_string())
+    },
+    (Some(name), None) => {
+      match (*default_layouts::DEFAULT_LAYOUTS).get(&name.to_string()) {
+        None => Err(format!("Error: no builtin layout named {}", name)),
+        Some(layout) => Ok(Cow::Borrowed(*layout))
+      }
+    },
+    (None, Some(path)) => {
+      match layout_loading::load_layout_from_file(path) {
+        Err(err) => Err(err),
+        Ok(layout) => Ok(Cow::Owned(layout))
+      }
+    }
   }
 }
 

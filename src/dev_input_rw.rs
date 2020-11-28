@@ -13,7 +13,7 @@ use std::os::unix::io::RawFd;
 use nix::ioctl_write_int;
 use crate::keys::{Event};
 use num_traits::FromPrimitive;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 pub struct DevInputReader {
   fd: RawFd

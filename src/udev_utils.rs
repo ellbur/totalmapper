@@ -4,10 +4,53 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
+use crate::keys::Layout;
 
-pub fn add_udev_rule(default_layout_name: Option<&str>, layout_file_path: Option<&str>) -> Result<(), String> {
-  let rule = udev_rule(default_layout_name, layout_file_path)?;
+fn convert_io_error<T>(whats_happening: &str, res: Result<T, std::io::Error>) -> Result<T, String> {
+  match res {
+    Ok(t) => Ok(t),
+    Err(e) => Err(format!("Error {}: {}", whats_happening, e))
+  }
+}
+
+fn convert_json_error<T>(whats_happening: &str, res: Result<T, serde_json::Error>) -> Result<T, String> {
+  match res {
+    Ok(t) => Ok(t),
+    Err(e) => Err(format!("Error {}: {}", whats_happening, e))
+  }
+}
+
+pub fn add_systemd_service(layout: &Layout) -> Result<(), String> {
+  write_layout_to_global_config(layout)?;
+  write_udev_rule()?;
+  write_systemd_service()?;
+  refresh_udev()?;
+  refresh_systemd()?;
+  Ok(())
+}
+
+fn write_layout_to_global_config(layout: &Layout) -> Result<(), String> {
+  let file_out = convert_io_error(
+    "saving layout to /etc/totalmapper.json",
+    OpenOptions::new()
+      .truncate(true).read(false).create(true).write(true)
+      .open("/etc/totalmapper.json")
+  )?;
   
+  let buffered_out = std::io::BufWriter::new(file_out);
+  
+  convert_json_error(
+    "saving layout to /etc/totalmapper.json",
+    serde_json::to_writer_pretty(
+      buffered_out,
+      layout
+    )
+  )?;
+  
+  Ok(())
+}
+
+pub fn write_udev_rule() -> Result<(), String> {
   let path = "/etc/udev/rules.d/80-totalmapper.rules";
   let mut out_file = match OpenOptions::new()
     .truncate(true).read(false).create(true).write(true)
@@ -24,16 +67,50 @@ pub fn add_udev_rule(default_layout_name: Option<&str>, layout_file_path: Option
     Ok(out_file) => out_file
   };
   
-  match out_file.write(rule.as_bytes()) {
+  match out_file.write(
+    "KERNEL==\"event*\", ACTION==\"add\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}=\"totalmapper@%N.service\"\n".as_bytes()
+  ) {
     Err(err) => return Err(format!("{}", err)),
     Ok(_) => ()
   };
   
-  match out_file.write("\n".as_bytes()) {
+  Ok(())
+}
+
+pub fn write_systemd_service() -> Result<(), String> {
+  let path = "/etc/systemd/system/totalmapper@.service";
+  let mut out_file = match OpenOptions::new()
+    .truncate(true).read(false).create(true).write(true)
+    .open(path)
+  {
+    Err(err) => {
+      match err.kind() {
+        std::io::ErrorKind::PermissionDenied => {
+          return Err(format!("Permission denied writing to {}. You likely must run this sub-command as root.", path));
+        },
+        _ => return Err(format!("{}", err))
+      }
+    },
+    Ok(out_file) => out_file
+  };
+  
+  match out_file.write(
+    "[Unit]\n\
+    StopWhenUnneeded=true\n\
+    Description=Totalmapper\n\
+    \n\
+    [Service]\n\
+    Type=simple\n\
+    ExecStart=/usr/bin/totalmapper remap --layout-file /etc/totalmapper.json --only-if-keyboard --dev-file /%I\n".as_bytes()
+  ) {
     Err(err) => return Err(format!("{}", err)),
     Ok(_) => ()
   };
   
+  Ok(())
+}
+
+pub fn refresh_udev() -> Result<(), String> {
   match Command::new("/usr/bin/udevadm").args(&["control", "--reload"]).status() {
     Err(e) => Err(format!("Failed to run udevadm: {}", e)),
     Ok(_) => Ok(())
@@ -47,30 +124,12 @@ pub fn add_udev_rule(default_layout_name: Option<&str>, layout_file_path: Option
   Ok(())
 }
 
-pub fn udev_rule(default_layout_name: Option<&str>, layout_file_path: Option<&str>) -> Result<String, String> {
-  let lspec = layout_spec(default_layout_name, layout_file_path)?;
-  Ok(format!("KERNEL==\"event*\", ACTION==\"add\", RUN+=\"/usr/bin/totalmapper remap --fork --log {} --only-if-keyboard --dev-file %N\"", lspec))
-}
-
-pub fn layout_spec(default_layout_name: Option<&str>, layout_file_path: Option<&str>) -> Result<String, String> {
-  match (default_layout_name, layout_file_path) {
-    (None, None) => {
-      Err("Error: no layout specified. Use --default-layout or --layout-file.".to_string())
-    },
-    (Some(_), Some(_)) => {
-      Err("Error: use either --default-layout or --layout-file, not both.".to_string())
-    },
-    (Some(name), None) => {
-      Ok(format!("--default-layout {}", name))
-    },
-    (None, Some(path)) => {
-      if path.contains('"') || path.contains('\'') || path.contains('\\') {
-        Err(format!("Cannot use layout file {} in a udev rule due to limitations on udev escaping.", path))
-      }
-      else {
-        Ok(format!("--layout-file '{}'", path.escape_default()))
-      }
-    }
-  }
+pub fn refresh_systemd() -> Result<(), String> {
+  match Command::new("/usr/bin/systemctl").args(&["daemon-reload"]).status() {
+    Err(e) => Err(format!("Failed to reload systemd: {}", e)),
+    Ok(_) => Ok(())
+  }?;
+  
+  Ok(())
 }
 
