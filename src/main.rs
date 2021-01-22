@@ -13,6 +13,7 @@ mod keyboard_listing;
 mod udev_utils;
 mod layout_loading;
 mod version;
+mod monitor;
 
 use clap::{Arg, App};
 use std::borrow::Cow;
@@ -82,6 +83,16 @@ fn main() {
           .required(true)
           .index(1)
           .about("The name of the builtin layout to print. Use `totalmapper list_default_layouts` to see the list of builtin layouts.")
+        )
+      )
+      .subcommand(App::new("monitor")
+        .about("Print events from a keyboard device (without consuming them)")
+        .arg(Arg::new("dev_file")
+          .long("dev-file")
+          .takes_value(true)
+          .value_name("FILE")
+          .number_of_values(1)
+          .about("A path under /dev/input representing a keyboard device. To find your keyboards, run `totalmapper list_keyboards`.")
         )
       )
       .subcommand(App::new("add_systemd_service")
@@ -159,6 +170,16 @@ fn main() {
       },
       Some(layout) => {
         println!("{}", serde_json::to_string_pretty(layout).unwrap())
+      }
+    }
+  }
+  else if let Some(m) = m.subcommand_matches("monitor") {
+    match m.value_of("dev_file") {
+      None => {
+        println!("Must specify --dev-file");
+      },
+      Some(dev_file) => {
+        monitor::run_monitor(dev_file);
       }
     }
   }

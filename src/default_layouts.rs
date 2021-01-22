@@ -173,7 +173,7 @@ fn _super_dvorak() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT]);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA]);
   
   let mut other_mappings = vec![
     Mapping { from: vec![TAB], to: vec![] },
@@ -189,7 +189,13 @@ fn _super_dvorak() -> Layout {
     Mapping { from: vec![TAB, COMMA], to: vec![LEFTCTRL, RIGHT] },
     
     Mapping { from: vec![CAPSLOCK], to: vec![] },
+    Mapping { from: vec![RIGHTALT], to: vec![] },
+    Mapping { from: vec![LEFTMETA], to: vec![] },
+    
+    Mapping { from: vec![LEFTMETA, Q], to: vec![ESC] },
+    Mapping { from: vec![RIGHTALT, Q], to: vec![ESC] },
     Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC] },
+    
     Mapping { from: vec![BACKSLASH], to: vec![TAB] },
     Mapping { from: vec![GRAVE], to: vec![LEFTMETA] },
   ];
