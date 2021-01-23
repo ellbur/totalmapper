@@ -14,6 +14,8 @@ mod udev_utils;
 mod layout_loading;
 mod version;
 mod monitor;
+mod monitor_raw;
+mod struct_de;
 
 use clap::{Arg, App};
 use std::borrow::Cow;
@@ -93,6 +95,16 @@ fn main() {
           .value_name("FILE")
           .number_of_values(1)
           .about("A path under /dev/input representing a keyboard device. To find your keyboards, run `totalmapper list_keyboards`.")
+        )
+      )
+      .subcommand(App::new("monitor_raw")
+        .about("Print all events from a any input device (without consuming them)")
+        .arg(Arg::new("dev_file")
+          .long("dev-file")
+          .takes_value(true)
+          .value_name("FILE")
+          .number_of_values(1)
+          .about("A path under /dev/input")
         )
       )
       .subcommand(App::new("add_systemd_service")
@@ -180,6 +192,16 @@ fn main() {
       },
       Some(dev_file) => {
         monitor::run_monitor(dev_file);
+      }
+    }
+  }
+  else if let Some(m) = m.subcommand_matches("monitor_raw") {
+    match m.value_of("dev_file") {
+      None => {
+        println!("Must specify --dev-file");
+      },
+      Some(dev_file) => {
+        monitor_raw::run_monitor_raw(dev_file);
       }
     }
   }
