@@ -86,7 +86,7 @@ impl DevInputWriter {
         sink: Vec::new()
       };
       
-      user_dev_data.add_string_in_buf("write_test", 80);
+      user_dev_data.add_string_in_buf("totalmapper", 80);
       
       user_dev_data.add_u16(3);
       user_dev_data.add_u16(1);
