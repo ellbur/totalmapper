@@ -16,6 +16,8 @@ mod version;
 mod monitor;
 mod monitor_raw;
 mod struct_de;
+mod tablet_mode_switch_reader;
+mod monitor_tablet_mode;
 
 use clap::{Arg, App};
 use std::borrow::Cow;
@@ -72,6 +74,11 @@ fn main() {
           .help_heading(Some("PROCESS"))
           .about("If the device selected with --dev-file is not a keyboard, exit successfully. Useful when running from udev, since there is no easy way to test in a udev rule whether an input device is a keyboard.")
         )
+        .arg(Arg::new("tablet_mode_switch_device")
+          .long("tablet-mode-switch-device")
+          .help_heading(Some("TABLET MODE"))
+          .about("Do not emit key events when the selected device indicates the computer is in tablet mode.")
+        )
       )
       .subcommand(App::new("list_keyboards")
         .about("List keyboard devices under /dev/input")
@@ -98,13 +105,23 @@ fn main() {
         )
       )
       .subcommand(App::new("monitor_raw")
-        .about("Print all events from a any input device (without consuming them)")
+        .about("Print all events from a any input device (without consuming them).")
         .arg(Arg::new("dev_file")
           .long("dev-file")
           .takes_value(true)
           .value_name("FILE")
           .number_of_values(1)
           .about("A path under /dev/input")
+        )
+      )
+      .subcommand(App::new("monitor_tablet_mode")
+        .about("Monitor a table mode switch device.")
+        .arg(Arg::new("dev_file")
+          .long("dev-file")
+          .takes_value(true)
+          .value_name("FILE")
+          .number_of_values(1)
+          .about("A path under /dev/input representing your tablet mode switch")
         )
       )
       .subcommand(App::new("add_systemd_service")
@@ -153,7 +170,7 @@ fn main() {
           },
           (false, Some(devs)) => {
             let devs2 = devs.collect();
-            match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout) {
+            match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout, &None) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
@@ -202,6 +219,16 @@ fn main() {
       },
       Some(dev_file) => {
         monitor_raw::run_monitor_raw(dev_file);
+      }
+    }
+  }
+  else if let Some(m) = m.subcommand_matches("monitor_tablet_mode") {
+    match m.value_of("dev_file") {
+      None => {
+        println!("Must specify --dev-file");
+      },
+      Some(dev_file) => {
+        monitor_tablet_mode::run_monitor(dev_file);
       }
     }
   }

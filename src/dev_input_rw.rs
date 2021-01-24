@@ -16,7 +16,7 @@ use num_traits::FromPrimitive;
 use std::path::{Path};
 
 pub struct DevInputReader {
-  fd: RawFd
+  pub fd: RawFd
 }
 
 impl DevInputReader {
@@ -43,8 +43,8 @@ impl DevInputReader {
     }
   }
   
-  pub fn open(path: &Path, exclusive: bool) -> Result<DevInputReader, Error> {
-    let fd = open(path, OFlag::O_RDONLY, Mode::empty())?;
+  pub fn open(path: &Path, exclusive: bool, nonblock: bool) -> Result<DevInputReader, Error> {
+    let fd = open(path, if nonblock {OFlag::O_RDONLY | OFlag::O_NONBLOCK} else {OFlag::O_RDONLY}, Mode::empty())?;
     
     if exclusive {
       unsafe {
