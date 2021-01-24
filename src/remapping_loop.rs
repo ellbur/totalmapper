@@ -14,6 +14,8 @@ use mio::{Interest, Poll, Token, Events};
 use mio::unix::SourceFd;
 use crate::tablet_mode_switch_reader::TabletModeSwitchReader;
 use crate::tablet_mode_switch_reader::TableModeEvent::{On, Off};
+use std::thread;
+use std::time;
 
 pub fn do_remapping_loop_all_devices(layout: &Layout) -> Result<(), String> {
   match list_keyboards() {
@@ -73,7 +75,7 @@ pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, 
     });
   }
   
-  let mut threads: Vec<JoinHandle<Result<(), Error>>> = Vec::new();
+  let mut threads: Vec<JoinHandle<Result<(), String>>> = Vec::new();
   for mut rw in rws.drain(..) {
     let local_layout = layout.clone();
     threads.push(spawn(move || {
@@ -100,7 +102,7 @@ struct RW {
   t: Option<TabletModeSwitchReader>
 }
   
-fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error> {
+fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), String> {
   let mut mapper = key_transforms::Mapper::for_layout(&layout);
   
   const KEYBOARD: Token = Token(0);
@@ -121,7 +123,29 @@ fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error
   let mut in_tablet_mode: bool = false;
   
   loop {
-    poll.poll(&mut events, None).unwrap();
+    loop {
+      let mut restart_count: i32 = 0;
+      match poll.poll(&mut events, None) {
+        Ok(_) => {
+          break;
+        },
+        Err(e) => {
+          match e.kind() {
+            std::io::ErrorKind::Interrupted => {
+              restart_count += 1;
+              if restart_count > 1 {
+                // Avoid burning the CPU if we keep getting interrupted for some reason
+                thread::sleep(time::Duration::from_millis(1000 * (1 << restart_count)));
+              }
+              println!("totalmapper: poll() interrupted, restarting.");
+            },
+            _ => {
+              return Err(format!("poll failed: {}", e));
+            }
+          }
+        },
+      }
+    }
     
     for event in events.iter() {
       match event.token() {
@@ -135,14 +159,14 @@ fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error
                 return Ok(());
               }
               Err(e) => {
-                return Err(e);
+                return Err(format!("read() from keyboard device failed with {}", e));
               }
               Ok(ev_in) => {
                 if !in_tablet_mode {
                   let evs_out = mapper.step(ev_in);
 
                   for ev in evs_out {
-                    rw.w.send(ev)?;
+                    rw.w.send(ev).map_err(|e| format!("write() to synthetic keyboard failed with {}", e))?;
                   }
                 }
               }
@@ -156,20 +180,20 @@ fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error
                 break;
               }
               Err(e) => {
-                return Err(e);
+                return Err(format!("read() from tablet mode switch failed with {}", e));
               }
               Ok(ev_in) => {
                 match ev_in {
                   On => {
                     in_tablet_mode = true;
                     for ev in mapper.release_all() {
-                      rw.w.send(ev)?;
+                      rw.w.send(ev).map_err(|e| format!("write() to synthetic keyboard failed with {}", e))?;
                     }
                   },
                   Off => {
                     in_tablet_mode = false;
                     for ev in mapper.release_all() {
-                      rw.w.send(ev)?;
+                      rw.w.send(ev).map_err(|e| format!("write() to synthetic keyboard failed with {}", e))?;
                     }
                   }
                 }
