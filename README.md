@@ -16,7 +16,8 @@ With [`cargo`](https://doc.rust-lang.org/cargo/):
 
 ## Packages
 
-* Ubuntu: [`totalmapper_1.0.deb`](https://github.com/ellbur/totalmapper/releases/download/1.0/totalmapper_1.0.deb)
+* Ubuntu: [`totalmapper_1.1.0.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.1.0/totalmapper_1.1.0.deb)
+* Self-contained Linux amd64: [totalmapper-static-linux-amd64-1.1.0.tar.gz](https://github.com/ellbur/totalmapper/releases/download/v1.1.0/totalmapper-static-linux-amd64-1.1.0.tar.gz)
 
 # Running
 
@@ -46,23 +47,41 @@ Define your own layout (see below) and remap your keyboard with:
 
 Layouts are defined with a simple JSON syntax:
 
-    [
-      { "from": [ "CAPSLOCK" ], "to": [] },
-      { "from": [ "CAPSLOCK", "J" ], "to": [ "LEFT" ] },
-      { "from": [ "CAPSLOCK", "I" ], "to": [ "UP" ] },
-      { "from": [ "CAPSLOCK", "K" ], "to": [ "DOWN" ] },
-      { "from": [ "CAPSLOCK", "L" ], "to": [ "RIGHT" ] },
-      { "from": [ "CAPSLOCK", "H" ], "to": [ "HOME" ] },
-      { "from": [ "CAPSLOCK", "SEMICOLON" ], "to": [ "END" ] },
-      { "from": [ "CAPSLOCK", "U" ], "to": [ "PAGEUP" ] },
-      { "from": [ "CAPSLOCK", "M" ], "to": [ "PAGEDOWN" ] },
-      { "from": [ "CAPSLOCK", "N" ], "to": [ "LEFTCTRL", "LEFT" ] },
-      { "from": [ "CAPSLOCK", "COMMA" ], "to": [ "LEFTCTRL", "RIGHT" ] }
-    ]
+```json
+[
+  { "from": [ "CAPSLOCK" ], "to": [] },
+  { "from": [ "CAPSLOCK", "J" ], "to": [ "LEFT" ] },
+  { "from": [ "CAPSLOCK", "I" ], "to": [ "UP" ] },
+  { "from": [ "CAPSLOCK", "K" ], "to": [ "DOWN" ] },
+  { "from": [ "CAPSLOCK", "L" ], "to": [ "RIGHT" ] },
+  { "from": [ "CAPSLOCK", "H" ], "to": [ "HOME" ] },
+  { "from": [ "CAPSLOCK", "SEMICOLON" ], "to": [ "END" ] },
+  { "from": [ "CAPSLOCK", "U" ], "to": [ "PAGEUP" ] },
+  { "from": [ "CAPSLOCK", "M" ], "to": [ "PAGEDOWN" ] },
+  { "from": [ "CAPSLOCK", "N" ], "to": [ "LEFTCTRL", "LEFT" ] },
+  { "from": [ "CAPSLOCK", "COMMA" ], "to": [ "LEFTCTRL", "RIGHT" ] }
+]
+```
 
 The names of keys are taken from [the Linux header](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h), minus the `KEY_` prefix.
 
 You can use any key as a modifier. You don't have to tell totalmapper which keys are modifiers; simply creating a mapping that uses the key in combination with another makes it act like a modifier.
 
 But be careful that if you want to use a key as a modifier that normally has another function, you will want to map the key by itself to `[]`, as in the example above.
+
+# On Chrome OS
+
+The self-contained package will run on Intel chromebooks in developer mode. There is no need to install crouton. The binary must be copied to a filesystem that allows code execution, such as `/usr/local/bin`.
+
+The `chronos` user is part of the `input` group but not the `uinput` group. You can fix this problem with:
+
+```bash
+sudo chown root:input /dev/uinput
+```
+
+On some devices, the remapped keyboard will not automatically disable in tablet mode, which is annoying. Use the `--tablet-mode-switch-device` option to have totalmapper read the tablet mode switch device and turn itself off:
+
+    totalmapper remap --dev-file /dev/input/event2 --tablet-mode-switch-device /dev/input/event5 --default-layout caps-for-movement
+
+You can test devices under `/dev/input` with `evtest` to find your tablet mode switch.
 
