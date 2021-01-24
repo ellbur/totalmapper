@@ -145,6 +145,19 @@ impl Mapper {
       },
     }
   }
+  
+  pub fn release_all(self: &mut Mapper) -> Vec<Event> {
+    let to_release = self.state.input_pressed_keys.clone();
+    
+    let mut res: Vec<Event> = Vec::new();
+    
+    for k in to_release {
+      let mut chunk = self.step(Released(k));
+      res.append(&mut chunk);
+    }
+    
+    res
+  }
 }
 
 fn add_new_mapping(state: &mut State, m: &Mapping) -> Vec<Event> {

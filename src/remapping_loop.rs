@@ -3,7 +3,6 @@
 
 use crate::keys::Layout;
 use nix::Error;
-use nix::Error::Sys;
 use nix::errno::Errno::ENODEV;
 use crate::key_transforms;
 use crate::keyboard_listing::{filter_keyboards, list_keyboards};
@@ -13,7 +12,8 @@ use std::path::{Path, PathBuf};
 use nix::errno::Errno::EAGAIN;
 use mio::{Interest, Poll, Token, Events};
 use mio::unix::SourceFd;
-use std::time;
+use crate::tablet_mode_switch_reader::TabletModeSwitchReader;
+use crate::tablet_mode_switch_reader::TableModeEvent::{On, Off};
 
 pub fn do_remapping_loop_all_devices(layout: &Layout) -> Result<(), String> {
   match list_keyboards() {
@@ -58,9 +58,18 @@ pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, 
       Ok(w) => Ok(w)
     }?;
     
+    let t = match tablet_mode_switch_device {
+      None => Ok(None),
+      Some(path) => match TabletModeSwitchReader::open(path, true) {
+        Err(e) => Err(format!("Failed to open tablet mode device {:?} for reading: {}", path, e)),
+        Ok(t) => Ok(Some(t))
+      }
+    }?;
+    
     rws.push(RW {
       r: r,
-      w: w
+      w: w,
+      t: t
     });
   }
   
@@ -87,7 +96,8 @@ pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, 
 
 struct RW {
   r: DevInputReader,
-  w: DevInputWriter
+  w: DevInputWriter,
+  t: Option<TabletModeSwitchReader>
 }
   
 fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error> {
@@ -99,8 +109,17 @@ fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error
   let mut poll = Poll::new().unwrap();
   poll.registry().register(&mut SourceFd(&rw.r.fd), KEYBOARD, Interest::READABLE).unwrap();
   
+  match &rw.t {
+    None => (),
+    Some(t) => {
+      poll.registry().register(&mut SourceFd(&t.fd), TABLET_SWITCH, Interest::READABLE).unwrap();
+    }
+  }
+  
   let mut events = Events::with_capacity(24);
 
+  let mut in_tablet_mode: bool = false;
+  
   loop {
     poll.poll(&mut events, None).unwrap();
     
@@ -119,10 +138,40 @@ fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Error
                 return Err(e);
               }
               Ok(ev_in) => {
-                let evs_out = mapper.step(ev_in);
+                if !in_tablet_mode {
+                  let evs_out = mapper.step(ev_in);
 
-                for ev in evs_out {
-                  rw.w.send(ev)?;
+                  for ev in evs_out {
+                    rw.w.send(ev)?;
+                  }
+                }
+              }
+            }
+          }
+        }
+        TABLET_SWITCH => {
+          loop {
+            match rw.t.as_mut().unwrap().next() {
+              Err(Error::Sys(EAGAIN)) => {
+                break;
+              }
+              Err(e) => {
+                return Err(e);
+              }
+              Ok(ev_in) => {
+                match ev_in {
+                  On => {
+                    in_tablet_mode = true;
+                    for ev in mapper.release_all() {
+                      rw.w.send(ev)?;
+                    }
+                  },
+                  Off => {
+                    in_tablet_mode = false;
+                    for ev in mapper.release_all() {
+                      rw.w.send(ev)?;
+                    }
+                  }
                 }
               }
             }
