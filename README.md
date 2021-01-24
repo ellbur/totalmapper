@@ -17,7 +17,7 @@ With [`cargo`](https://doc.rust-lang.org/cargo/):
 ## Packages
 
 * Ubuntu: [`totalmapper_1.1.0.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.1.0/totalmapper_1.1.0.deb)
-* Self-contained Linux amd64: [totalmapper-static-linux-amd64-1.1.0.tar.gz](https://github.com/ellbur/totalmapper/releases/download/v1.1.0/totalmapper-static-linux-amd64-1.1.0.tar.gz)
+* Self-contained Linux amd64: [`totalmapper-static-linux-amd64-1.1.0.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.1.0/totalmapper-static-linux-amd64-1.1.0.tar.gz)
 
 # Running
 
