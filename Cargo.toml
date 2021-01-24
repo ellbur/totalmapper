@@ -8,8 +8,6 @@ edition = "2018"
 
 [dependencies]
 nix = "0.19.0"
-nix-8 = { package = "nix", version = "0.8.1" }
-rand = "0.7.3"
 enum-utils = "0.1.2"
 serde_json = "1.0.59"
 serde = { version = "1.0.117", features = ["derive"] }
