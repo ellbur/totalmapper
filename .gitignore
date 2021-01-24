@@ -3,3 +3,4 @@
 /deb-building/totalmapper/DEBIAN/control
 /deb-building/totalmapper/usr/bin/totalmapper
 /deb-building/*.deb
+/raw-building

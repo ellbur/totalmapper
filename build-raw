@@ -1,0 +1,32 @@
+#!/usr/bin/rakudo
+
+# vim: ft=perl6
+
+use FindBin;
+
+my $here = Bin();
+
+my $version_file = $here.add('version');
+my $version = (slurp $version_file).trim;
+
+my $raw_building_dir = $here.add('raw-building');
+run </bin/rm -rf>, $raw_building_dir;
+$raw_building_dir.mkdir;
+
+my $tree_root = $raw_building_dir.add("totalmapper-static-linux-amd64-$version");
+$tree_root.mkdir;
+
+my $version_rs_file = $here.add('src/version.rs');
+my $version_rs_fh = open $version_rs_file, :w;
+$version_rs_fh.print: "pub const VERSION: &str = \"$version\";\n";
+$version_rs_fh.close;
+
+run <cargo build --release --target x86_64-unknown-linux-musl>, cwd => $here;
+
+my $exe_source = $here.add('target/x86_64-unknown-linux-musl/release/totalmapper');
+my $exe_sink = $tree_root.add('totalmapper');
+$exe_source.copy: $exe_sink;
+
+my $archive_file = $raw_building_dir.add: "totalmapper-static-linux-amd64-$version.tar.gz";
+run <tar czf>, $archive_file, $tree_root.basename, cwd => $raw_building_dir;
+
