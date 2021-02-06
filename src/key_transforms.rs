@@ -160,6 +160,30 @@ impl Mapper {
   }
 }
 
+fn is_action_key(k: &KeyCode) -> bool {
+  use KeyCode::{LEFTSHIFT, RIGHTSHIFT, LEFTMETA, RIGHTMETA, LEFTCTRL, RIGHTCTRL};
+  
+  match k {
+    LEFTSHIFT => false,
+    RIGHTSHIFT => false,
+    LEFTMETA => false,
+    RIGHTMETA => false,
+    LEFTCTRL => false,
+    RIGHTCTRL => false,
+    _ => true
+  }
+}
+
+fn is_action_mapping(m: &Mapping) -> bool {
+  if m.to.len() == 0 {
+    false
+  }
+  else {
+    let last_key = &m.to[m.to.len() - 1];
+    is_action_key(last_key)
+  }
+}
+
 fn add_new_mapping(state: &mut State, m: &Mapping) -> Vec<Event> {
   let mut res: Vec<Event> = Vec::new();
   
@@ -182,20 +206,52 @@ fn add_new_mapping(state: &mut State, m: &Mapping) -> Vec<Event> {
     }
   });
   
-  for new_key in &m.to {
-    if !state.mapped_output_keys.contains(new_key) {
-      if state.pass_through_keys.contains(new_key) {
-        state.pass_through_keys.retain(|k2| k2 != new_key);
-        state.mapped_output_keys.push(*new_key);
+  // An "action mapping" is one that has an immediate effect, like
+  // typing a key. The modifiers should be stripped immediately after
+  // they are used to avoid having them pressed when the next key is pressed.
+  if is_action_mapping(&m) {
+    let last_key = &m.to[m.to.len()-1];
+    if !state.mapped_output_keys.contains(last_key) && !state.pass_through_keys.contains(last_key) {
+      let mut m_modifiers_to_press: Vec<KeyCode> = Vec::new();
+      
+      for potential_new_key in &m.to {
+        if !state.mapped_output_keys.contains(potential_new_key) && !state.pass_through_keys.contains(potential_new_key) {
+          m_modifiers_to_press.push(*potential_new_key);
+        }
       }
-      else {
-        res.push(Pressed(*new_key));
-        state.mapped_output_keys.push(*new_key);
+      for k in &m_modifiers_to_press {
+        res.push(Pressed(*k));
       }
+      res.push(Pressed(*last_key));
+      for k in (&m_modifiers_to_press).iter().rev() {
+        res.push(Released(*k));
+      }
+      
+      let modifier_stripped_mapping = Mapping {
+        from: m.from.clone(),
+        to: vec![*last_key]
+      };
+      
+      state.active_mappings.push(modifier_stripped_mapping);
+      state.mapped_output_keys.push(*last_key);
     }
   }
-  
-  state.active_mappings.push(m.clone());
+  else {
+    for new_key in &m.to {
+      if !state.mapped_output_keys.contains(new_key) {
+        if state.pass_through_keys.contains(new_key) {
+          state.pass_through_keys.retain(|k2| k2 != new_key);
+          state.mapped_output_keys.push(*new_key);
+        }
+        else {
+          res.push(Pressed(*new_key));
+          state.mapped_output_keys.push(*new_key);
+        }
+      }
+    }
+    
+    state.active_mappings.push(m.clone());
+  }
   
   return res;
 }
