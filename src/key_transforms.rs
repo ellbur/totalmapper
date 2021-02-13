@@ -211,30 +211,38 @@ fn add_new_mapping(state: &mut State, m: &Mapping) -> Vec<Event> {
   // they are used to avoid having them pressed when the next key is pressed.
   if is_action_mapping(&m) {
     let last_key = &m.to[m.to.len()-1];
-    if !state.mapped_output_keys.contains(last_key) && !state.pass_through_keys.contains(last_key) {
-      let mut m_modifiers_to_press: Vec<KeyCode> = Vec::new();
-      
-      for potential_new_key in &m.to {
-        if !state.mapped_output_keys.contains(potential_new_key) && !state.pass_through_keys.contains(potential_new_key) {
-          m_modifiers_to_press.push(*potential_new_key);
-        }
-      }
-      for k in &m_modifiers_to_press {
-        res.push(Pressed(*k));
-      }
-      res.push(Pressed(*last_key));
-      for k in (&m_modifiers_to_press).iter().rev() {
-        res.push(Released(*k));
-      }
-      
-      let modifier_stripped_mapping = Mapping {
-        from: m.from.clone(),
-        to: vec![*last_key]
-      };
-      
-      state.active_mappings.push(modifier_stripped_mapping);
-      state.mapped_output_keys.push(*last_key);
+    
+    let last_key_currently_pressed = state.mapped_output_keys.contains(last_key) || state.pass_through_keys.contains(last_key);
+    
+    if last_key_currently_pressed {
+      // Make sure every action mapping does something. If the key
+      // is already pressed, release it, and press it again!
+      res.push(Released(*last_key));
     }
+    
+    let mut m_modifiers_to_press: Vec<KeyCode> = Vec::new();
+    for i in 0..m.to.len()-1 {
+      let potential_new_key = &m.to[i];
+      if !state.mapped_output_keys.contains(potential_new_key) && !state.pass_through_keys.contains(potential_new_key) {
+        m_modifiers_to_press.push(*potential_new_key);
+      }
+    }
+    
+    for k in &m_modifiers_to_press {
+      res.push(Pressed(*k));
+    }
+    res.push(Pressed(*last_key));
+    for k in (&m_modifiers_to_press).iter().rev() {
+      res.push(Released(*k));
+    }
+    
+    let modifier_stripped_mapping = Mapping {
+      from: m.from.clone(),
+      to: vec![*last_key]
+    };
+    
+    state.active_mappings.push(modifier_stripped_mapping);
+    state.mapped_output_keys.push(*last_key);
   }
   else {
     for new_key in &m.to {
@@ -277,8 +285,7 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> Vec<Event> {
       any_hit = true;
       break;
     }
-    
-    if m.to.contains(&k) {
+    else if m.to.contains(&k) {
       any_hit = true;
       break;
     }
@@ -375,5 +382,78 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> Vec<Event> {
   });
   
   return res;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use KeyCode::*;
+  
+  #[test]
+  fn test_most_basic() {
+    let layout = Layout(vec![
+      Mapping { from: vec![A], to: vec![B] },
+    ]);
+    let mut mapper = Mapper::for_layout(&layout);
+    assert_eq!(vec![Pressed(B)], mapper.step(Pressed(A)));
+  }
+  
+  #[test]
+  fn test_single_key_remap() {
+    let layout = Layout(vec![
+      Mapping { from: vec![A], to: vec![B] },
+    ]);
+    let mut mapper = Mapper::for_layout(&layout);
+    assert_eq!(vec![Pressed(B)], mapper.step(Pressed(A)));
+    assert_eq!(vec![Released(B)], mapper.step(Released(A)));
+    assert_eq!(vec![Pressed(C)], mapper.step(Pressed(C)));
+    assert_eq!(vec![Released(C)], mapper.step(Released(C)));
+    assert_eq!(vec![Pressed(LEFTSHIFT)], mapper.step(Pressed(LEFTSHIFT)));
+    assert_eq!(vec![Pressed(B)], mapper.step(Pressed(A)));
+  }
+  
+  #[test]
+  fn test_multi_key_overlap() {
+    let layout = Layout(vec![
+      Mapping { from: vec![CAPSLOCK], to: vec![] },
+      Mapping { from: vec![CAPSLOCK, M], to: vec![LEFTSHIFT, EQUAL] },
+      Mapping { from: vec![CAPSLOCK, U], to: vec![EQUAL] },
+    ]);
+    let mut mapper = Mapper::for_layout(&layout);
+    let empty: Vec<Event> = Vec::new();
+    
+    assert_eq!(empty, mapper.step(Pressed(CAPSLOCK)));
+    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL), Released(LEFTSHIFT)], mapper.step(Pressed(M)));
+    assert_eq!(vec![Released(EQUAL), Pressed(EQUAL)], mapper.step(Pressed(U)));
+  }
+  
+  #[test]
+  fn test_super_multi() {
+    let layout = Layout(vec![
+      Mapping { from: vec![CAPSLOCK], to: vec![] },
+      Mapping { from: vec![TAB], to: vec![] },
+      Mapping { from: vec![F], to: vec![U] },
+      Mapping { from: vec![N], to: vec![B] },
+      Mapping { from: vec![CAPSLOCK, M], to: vec![LEFTSHIFT, EQUAL] },
+      Mapping { from: vec![CAPSLOCK, F], to: vec![EQUAL] },
+      Mapping { from: vec![CAPSLOCK, N], to: vec![LEFTSHIFT, K1] },
+      Mapping { from: vec![TAB, M], to: vec![PAGEDOWN] },
+      Mapping { from: vec![TAB, N], to: vec![LEFTCTRL, LEFT] },
+    ]);
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    let empty: Vec<Event> = Vec::new();
+    
+    assert_eq!(vec![Pressed(LEFTSHIFT)], mapper.step(Pressed(LEFTSHIFT)));
+    assert_eq!(empty, mapper.step(Pressed(TAB)));
+    assert_eq!(vec![Pressed(LEFTCTRL), Pressed(LEFT), Released(LEFTCTRL)], mapper.step(Pressed(N)));
+    assert_eq!(vec![Released(LEFT)], mapper.step(Released(N)));
+    assert_eq!(empty, mapper.step(Released(TAB)));
+    assert_eq!(vec![Pressed(M)], mapper.step(Pressed(M)));
+    assert_eq!(vec![Released(M)], mapper.step(Released(M)));
+    assert_eq!(vec![Released(LEFTSHIFT)], mapper.step(Released(LEFTSHIFT)));
+    assert_eq!(empty, mapper.step(Pressed(CAPSLOCK)));
+    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL), Released(LEFTSHIFT)], mapper.step(Pressed(M)));
+  }
 }
 
