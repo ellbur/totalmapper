@@ -29,3 +29,5 @@ $exe_source.copy: $exe_sink;
 my $archive_file = $raw_building_dir.add: "totalmapper-static-linux-amd64-$version.tar.gz";
 run <tar czf>, $archive_file.absolute, $tree_root.basename, cwd => $raw_building_dir;
 
+say "Generated {$archive_file.absolute}";
+
