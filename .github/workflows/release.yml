@@ -5,7 +5,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_disptch:
+  workflow_dispatch:
 
 jobs:
   buildJob:
