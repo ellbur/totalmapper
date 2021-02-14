@@ -1,0 +1,30 @@
+
+name: make-relase
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  buildJob:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install raku
+        run: sudo apt install rakudo
+      - name: Install FindBin
+        run: sudo zef install FindBin
+      - name: Install aarch64 target
+        run: rustup target add aarch64-unknown-linux-musl
+      - name: Install amd64 target
+        run: rustup target add x86_64-unknown-linux-musl
+      - name: Build Package
+        run: ./release-scripts/build-raw-amd64
+      - name: Make release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            raw-building/totalmapper-static-linux-aarch64-*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
