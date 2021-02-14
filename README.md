@@ -73,7 +73,7 @@ But be careful that if you want to use a key as a modifier that normally has ano
 
 # On Chrome OS
 
-The self-contained package will run on Intel chromebooks in developer mode. There is no need to install crouton. The binary must be copied to a filesystem that allows code execution, such as `/usr/local/bin`.
+The self-contained packages will run on Intel or ARM chromebooks in developer mode. There is no need to install crouton. The binary must be copied to a filesystem that allows code execution, such as `/usr/local/bin`.
 
 The `chronos` user is part of the `input` group but not the `uinput` group. You can fix this problem with:
 
