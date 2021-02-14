@@ -218,7 +218,7 @@ fn _super_dvorak() -> Layout {
   
   Layout {
     mappings: all_mappings,
-    no_repeat_keys: Vec::new()
+    no_repeat_keys: vec![GRAVE, K1, K2, K3, K4, K5, K6, K7, K8, K9, K0, MINUS, EQUAL, Q, W, E, R, T, Y, U, I, O, P, LEFTBRACE, RIGHTBRACE, BACKSLASH, A, S, D, F, G, H, J, K, L, SEMICOLON, APOSTROPHE, Z, X, C, V, B, N, M, COMMA, DOT, SLASH]
   }
 }
 
