@@ -20,8 +20,12 @@ jobs:
         run: rustup target add aarch64-unknown-linux-musl
       - name: Install amd64 target
         run: rustup target add x86_64-unknown-linux-musl
-      - name: Build Package
+      - name: Build raw amd64
         run: ./release-scripts/build-raw-amd64
+      - name: Build raw aarch64
+        run: ./release-scripts/build-raw-aarch64
+      - name: Build debs
+        run: ./release-scripts/build-deb-in-docker
       - name: Make release
         uses: softprops/action-gh-release@v1
         with:
