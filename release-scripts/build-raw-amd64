@@ -27,5 +27,5 @@ my $exe_sink = $tree_root.add('totalmapper');
 $exe_source.copy: $exe_sink;
 
 my $archive_file = $raw_building_dir.add: "totalmapper-static-linux-amd64-$version.tar.gz";
-run <tar czf>, $archive_file, $tree_root.basename, cwd => $raw_building_dir;
+run <tar czf>, $archive_file.absolute, $tree_root.basename, cwd => $raw_building_dir;
 

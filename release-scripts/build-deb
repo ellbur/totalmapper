@@ -21,11 +21,12 @@ given slurp $version_rs_file {
 
 run <cargo build --release --target x86_64-unknown-linux-gnu>, cwd => $repo-root;
 
+$exe_sink.parent.mkdir;
+$exe_source.copy: $exe_sink;
+
 my $installed_size_text = (run <du -s>, $tree_root, :out).out.slurp(:close);
 unless ($installed_size_text.match: /\s*(\d+)<|w>.*/) { die("Didn't match") }
 my $installed_size = $0;
-
-$exe_source.copy: $exe_sink;
 
 my $control_content = qq:to/END/;
 Package: totalmapper
