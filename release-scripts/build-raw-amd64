@@ -2,9 +2,7 @@
 
 # vim: ft=perl6
 
-use FindBin;
-
-my $here = Bin();
+my $here = $*PROGRAM-NAME.IO.parent;
 my $repo-root = $here.add('..');
 
 my $raw_building_dir = $repo-root.add('raw-building');

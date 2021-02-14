@@ -14,10 +14,6 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install raku
         run: sudo apt install rakudo
-      - name: Install zef
-        run: sudo apt install perl6-zef
-      - name: Install FindBin
-        run: sudo zef install FindBin
       - name: Install aarch64 target
         run: rustup target add aarch64-unknown-linux-musl
       - name: Install amd64 target
