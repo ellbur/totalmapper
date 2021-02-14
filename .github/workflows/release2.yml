@@ -31,6 +31,6 @@ jobs:
         with:
           files: |
             raw-building/totalmapper-static-linux-aarch64-*.tar.gz
-            raw-building/totalmapper-*.deb
+            deb-building/totalmapper-*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
