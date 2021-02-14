@@ -169,18 +169,18 @@ fn _super_dvorak() -> Layout {
     row_1_alt_gr: "".to_string(),
     row_1_shift_alt_gr: "".to_string(),
     
-    row_q: ";,.pyfgcrl~@".to_string(),
+    row_q: ";,.pyf  rl~@".to_string(),
     row_q_shift: ":<>       ?^".to_string(),
     row_q_alt_gr: " {}% \\*][|".to_string(),
     row_q_shift_alt_gr: "".to_string(),
     
-    row_a: "aoeuidhtns-".to_string(),
-    row_a_shift: "AOEUIDHTNS@".to_string(),
+    row_a: "aoeui     -".to_string(),
+    row_a_shift: "AOEUI     @".to_string(),
     row_a_alt_gr: "   = &)(/_$".to_string(),
     row_a_shift_alt_gr: "".to_string(),
     
-    row_z: "'qjkxbmwvz".to_string(),
-    row_z_shift: "\"QJKXBMWVZ".to_string(),
+    row_z: "'qjkx   vz".to_string(),
+    row_z_shift: "\"QJKX   VZ".to_string(),
     row_z_alt_gr: "     !+#".to_string(),
     row_z_shift_alt_gr: "".to_string(),
   };
@@ -188,6 +188,17 @@ fn _super_dvorak() -> Layout {
   let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA]);
   
   let mut other_mappings = vec![
+    Mapping { from: vec![U], to: vec![F14, G] },
+    Mapping { from: vec![I], to: vec![F15, C] },
+    Mapping { from: vec![H], to: vec![F16, D] },
+    Mapping { from: vec![J], to: vec![F17, H] },
+    Mapping { from: vec![K], to: vec![F18, T] },
+    Mapping { from: vec![L], to: vec![F19, N] },
+    Mapping { from: vec![SEMICOLON], to: vec![F20, S] },
+    Mapping { from: vec![N], to: vec![F21, B] },
+    Mapping { from: vec![M], to: vec![F22, M] },
+    Mapping { from: vec![COMMA], to: vec![F23, W] },
+    
     Mapping { from: vec![TAB], to: vec![] },
     Mapping { from: vec![TAB, J], to: vec![LEFT] }, 
     Mapping { from: vec![TAB, I], to: vec![UP] }, 
