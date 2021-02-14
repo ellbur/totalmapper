@@ -221,60 +221,44 @@ fn add_new_mapping(state: &mut State, m: &Mapping) -> Vec<Event> {
     }
   });
   
-  // An "action mapping" is one that has an immediate effect, like
-  // typing a key. The modifiers should be stripped immediately after
-  // they are used to avoid having them pressed when the next key is pressed.
-  if is_action_mapping(&m) {
-    let last_key = &m.to[m.to.len()-1];
-    
-    let last_key_currently_pressed = state.mapped_output_keys.contains(last_key) || state.pass_through_keys.contains(last_key);
-    
-    if last_key_currently_pressed {
-      // Make sure every action mapping does something. If the key
-      // is already pressed, release it, and press it again!
-      res.push(Released(*last_key));
-    }
-    
-    let mut m_modifiers_to_press: Vec<KeyCode> = Vec::new();
-    for i in 0..m.to.len()-1 {
-      let potential_new_key = &m.to[i];
-      if !state.mapped_output_keys.contains(potential_new_key) && !state.pass_through_keys.contains(potential_new_key) {
-        m_modifiers_to_press.push(*potential_new_key);
-      }
-    }
-    
-    for k in &m_modifiers_to_press {
-      res.push(Pressed(*k));
-    }
-    res.push(Pressed(*last_key));
-    for k in (&m_modifiers_to_press).iter().rev() {
-      res.push(Released(*k));
-    }
-    
-    let modifier_stripped_mapping = Mapping {
-      from: m.from.clone(),
-      to: vec![*last_key]
-    };
-    
-    state.active_mappings.push(modifier_stripped_mapping);
-    state.mapped_output_keys.push(*last_key);
-  }
-  else {
-    for new_key in &m.to {
-      if !state.mapped_output_keys.contains(new_key) {
-        if state.pass_through_keys.contains(new_key) {
-          state.pass_through_keys.retain(|k2| k2 != new_key);
-          state.mapped_output_keys.push(*new_key);
-        }
-        else {
-          res.push(Pressed(*new_key));
-          state.mapped_output_keys.push(*new_key);
+  let mut modifiers_to_release: Vec<KeyCode> = Vec::new();
+  for exsting_mapping in &state.active_mappings {
+    if is_action_mapping(exsting_mapping) {
+      for mod_key in &exsting_mapping.to[0 .. exsting_mapping.to.len()-1] {
+        if state.mapped_output_keys.contains(mod_key) {
+          modifiers_to_release.push(*mod_key);
         }
       }
     }
-    
-    state.active_mappings.push(m.clone());
   }
+  
+  for k in &modifiers_to_release {
+    res.push(Released(*k));
+  }
+  state.mapped_output_keys.retain(|&k| {
+    !modifiers_to_release.contains(&k)
+  });
+  
+  for new_key in &m.to {
+    if state.mapped_output_keys.contains(new_key) {
+      res.push(Released(*new_key));
+      res.push(Pressed(*new_key));
+    }
+    else {
+      if state.pass_through_keys.contains(new_key) {
+        res.push(Released(*new_key));
+        res.push(Pressed(*new_key));
+        state.pass_through_keys.retain(|k2| k2 != new_key);
+        state.mapped_output_keys.push(*new_key);
+      }
+      else {
+        res.push(Pressed(*new_key));
+        state.mapped_output_keys.push(*new_key);
+      }
+    }
+  }
+  
+  state.active_mappings.push(m.clone());
   
   return res;
 }
@@ -488,8 +472,8 @@ mod tests {
     let empty: Vec<Event> = Vec::new();
     
     assert_eq!(empty, mapper.step(Pressed(CAPSLOCK)));
-    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL), Released(LEFTSHIFT)], mapper.step(Pressed(M)));
-    assert_eq!(vec![Released(EQUAL), Pressed(EQUAL)], mapper.step(Pressed(U)));
+    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL)], mapper.step(Pressed(M)));
+    assert_eq!(vec![Released(LEFTSHIFT), Released(EQUAL), Pressed(EQUAL)], mapper.step(Pressed(U)));
   }
   
   #[test]
@@ -514,14 +498,14 @@ mod tests {
     
     assert_eq!(vec![Pressed(LEFTSHIFT)], mapper.step(Pressed(LEFTSHIFT)));
     assert_eq!(empty, mapper.step(Pressed(TAB)));
-    assert_eq!(vec![Pressed(LEFTCTRL), Pressed(LEFT), Released(LEFTCTRL)], mapper.step(Pressed(N)));
-    assert_eq!(vec![Released(LEFT)], mapper.step(Released(N)));
+    assert_eq!(vec![Pressed(LEFTCTRL), Pressed(LEFT)], mapper.step(Pressed(N)));
+    assert_eq!(vec![Released(LEFT), Released(LEFTCTRL)], mapper.step(Released(N)));
     assert_eq!(empty, mapper.step(Released(TAB)));
     assert_eq!(vec![Pressed(M)], mapper.step(Pressed(M)));
     assert_eq!(vec![Released(M)], mapper.step(Released(M)));
     assert_eq!(vec![Released(LEFTSHIFT)], mapper.step(Released(LEFTSHIFT)));
     assert_eq!(empty, mapper.step(Pressed(CAPSLOCK)));
-    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL), Released(LEFTSHIFT)], mapper.step(Pressed(M)));
+    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL)], mapper.step(Pressed(M)));
   }
   
   #[test]
