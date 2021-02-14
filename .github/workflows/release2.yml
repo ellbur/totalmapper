@@ -30,7 +30,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            raw-building/totalmapper-static-linux-aarch64-*.tar.gz
+            raw-building/totalmapper-*.tar.gz
             deb-building/totalmapper_*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
