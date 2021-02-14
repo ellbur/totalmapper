@@ -13,9 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install raku
-        run: sudo apt install rakudo
+        run: sudo apt-get install rakudo -y
       - name: Install aarch64 gcc
-        run: sudo apt install gcc-aarch64-linux-gnu
+        run: sudo apt-get install gcc-aarch64-linux-gnu -y
       - name: Install aarch64 target
         run: rustup target add aarch64-unknown-linux-musl
       - name: Install amd64 target
@@ -27,5 +27,6 @@ jobs:
         with:
           files: |
             raw-building/totalmapper-static-linux-aarch64-*.tar.gz
+            raw-building/totalmapper-*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

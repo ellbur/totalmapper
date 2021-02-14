@@ -47,7 +47,9 @@ $control_fh.close;
 
 run <dpkg-deb --build totalmapper>, cwd => $deb_building_dir;
 
+my $release = q:x/lsb_release -c -s/.trim;
+
 my $deb_source_file = $deb_building_dir.add('totalmapper.deb');
-my $deb_sink_file = $deb_building_dir.add("totalmapper_{$version}_amd64.deb");
+my $deb_sink_file = $deb_building_dir.add("totalmapper_{$version}-{$release}_amd64.deb");
 $deb_source_file.move($deb_sink_file);
 
