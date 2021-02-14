@@ -27,12 +27,12 @@ jobs:
       - name: Build debs
         run: ./release-scripts/build-deb-in-docker
       - name: Make release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v0.1.5
         with:
           fail_on_unmatched_files: true
           files: |
-            raw-building/totalmapper-aarch64-*.tar.gz
-            raw-building/totalmapper-amd64-*.tar.gz
+            raw-building/totalmapper-*-aarch64-*.tar.gz
+            raw-building/totalmapper-*-amd64-*.tar.gz
             deb-building/totalmapper_*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

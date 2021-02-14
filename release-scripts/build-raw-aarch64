@@ -15,7 +15,6 @@ given slurp $version_rs_file {
   default { die "Didn't match" }
 }
 
-run </bin/rm -rf>, $raw_building_dir;
 $raw_building_dir.mkdir;
 
 my $tree_root = $raw_building_dir.add("totalmapper-static-linux-aarch64-$version");
