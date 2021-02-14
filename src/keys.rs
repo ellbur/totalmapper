@@ -20,5 +20,9 @@ pub struct Mapping {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Layout(pub Vec<Mapping>);
+pub struct Layout {
+  pub mappings: Vec<Mapping>,
+  #[serde(default = "Vec::new")]
+  pub no_repeat_keys: Vec<KeyCode>
+}
 

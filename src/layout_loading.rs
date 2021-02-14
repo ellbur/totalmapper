@@ -35,3 +35,33 @@ pub fn load_layout_from_file(path: &str) -> Result<Layout, String> {
   )
 }
 
+#[cfg(test)]
+mod tests {
+  use crate::keys::Layout;
+  
+  #[test]
+  fn load_test_1() {
+    let _layout: Layout = serde_json::from_str(r#"
+      {
+        "mappings": [
+          { "from": [ "CAPSLOCK" ], "to": [] },
+          { "from": [ "CAPSLOCK", "Q" ], "to": [ "ESC" ] }
+        ],
+        "no_repeat_keys": []
+      }
+    "#).unwrap();
+  }
+  
+  #[test]
+  fn load_test_2() {
+    let _layout: Layout = serde_json::from_str(r#"
+      {
+        "mappings": [
+          { "from": [ "CAPSLOCK" ], "to": [] },
+          { "from": [ "CAPSLOCK", "Q" ], "to": [ "ESC" ] }
+        ]
+      }
+    "#).unwrap();
+  }
+}
+

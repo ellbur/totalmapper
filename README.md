@@ -50,19 +50,21 @@ Define your own layout (see below) and remap your keyboard with:
 Layouts are defined with a simple JSON syntax:
 
 ```json
-[
-  { "from": [ "CAPSLOCK" ], "to": [] },
-  { "from": [ "CAPSLOCK", "J" ], "to": [ "LEFT" ] },
-  { "from": [ "CAPSLOCK", "I" ], "to": [ "UP" ] },
-  { "from": [ "CAPSLOCK", "K" ], "to": [ "DOWN" ] },
-  { "from": [ "CAPSLOCK", "L" ], "to": [ "RIGHT" ] },
-  { "from": [ "CAPSLOCK", "H" ], "to": [ "HOME" ] },
-  { "from": [ "CAPSLOCK", "SEMICOLON" ], "to": [ "END" ] },
-  { "from": [ "CAPSLOCK", "U" ], "to": [ "PAGEUP" ] },
-  { "from": [ "CAPSLOCK", "M" ], "to": [ "PAGEDOWN" ] },
-  { "from": [ "CAPSLOCK", "N" ], "to": [ "LEFTCTRL", "LEFT" ] },
-  { "from": [ "CAPSLOCK", "COMMA" ], "to": [ "LEFTCTRL", "RIGHT" ] }
-]
+{
+  "mappings": [
+    { "from": [ "CAPSLOCK" ], "to": [] },
+    { "from": [ "CAPSLOCK", "J" ], "to": [ "LEFT" ] },
+    { "from": [ "CAPSLOCK", "I" ], "to": [ "UP" ] },
+    { "from": [ "CAPSLOCK", "K" ], "to": [ "DOWN" ] },
+    { "from": [ "CAPSLOCK", "L" ], "to": [ "RIGHT" ] },
+    { "from": [ "CAPSLOCK", "H" ], "to": [ "HOME" ] },
+    { "from": [ "CAPSLOCK", "SEMICOLON" ], "to": [ "END" ] },
+    { "from": [ "CAPSLOCK", "U" ], "to": [ "PAGEUP" ] },
+    { "from": [ "CAPSLOCK", "M" ], "to": [ "PAGEDOWN" ] },
+    { "from": [ "CAPSLOCK", "N" ], "to": [ "LEFTCTRL", "LEFT" ] },
+    { "from": [ "CAPSLOCK", "COMMA" ], "to": [ "LEFTCTRL", "RIGHT" ] }
+  ]
+}
 ```
 
 The names of keys are taken from [the Linux header](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h), minus the `KEY_` prefix.

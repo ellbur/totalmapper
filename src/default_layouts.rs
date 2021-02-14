@@ -28,19 +28,22 @@ lazy_static! {
 }
 
 fn _caps_lock_for_movement() -> Layout {
-  Layout(vec![
-    Mapping { from: vec![CAPSLOCK], to: vec![] },
-    Mapping { from: vec![CAPSLOCK, J], to: vec![LEFT] }, 
-    Mapping { from: vec![CAPSLOCK, I], to: vec![UP] }, 
-    Mapping { from: vec![CAPSLOCK, K], to: vec![DOWN] }, 
-    Mapping { from: vec![CAPSLOCK, L], to: vec![RIGHT] }, 
-    Mapping { from: vec![CAPSLOCK, H], to: vec![HOME] }, 
-    Mapping { from: vec![CAPSLOCK, SEMICOLON], to: vec![END] }, 
-    Mapping { from: vec![CAPSLOCK, U], to: vec![PAGEUP] }, 
-    Mapping { from: vec![CAPSLOCK, M], to: vec![PAGEDOWN] }, 
-    Mapping { from: vec![CAPSLOCK, N], to: vec![LEFTCTRL, LEFT] }, 
-    Mapping { from: vec![CAPSLOCK, COMMA], to: vec![LEFTCTRL, RIGHT] }
-  ])
+  Layout {
+    mappings: vec![
+      Mapping { from: vec![CAPSLOCK], to: vec![] },
+      Mapping { from: vec![CAPSLOCK, J], to: vec![LEFT] }, 
+      Mapping { from: vec![CAPSLOCK, I], to: vec![UP] }, 
+      Mapping { from: vec![CAPSLOCK, K], to: vec![DOWN] }, 
+      Mapping { from: vec![CAPSLOCK, L], to: vec![RIGHT] }, 
+      Mapping { from: vec![CAPSLOCK, H], to: vec![HOME] }, 
+      Mapping { from: vec![CAPSLOCK, SEMICOLON], to: vec![END] }, 
+      Mapping { from: vec![CAPSLOCK, U], to: vec![PAGEUP] }, 
+      Mapping { from: vec![CAPSLOCK, M], to: vec![PAGEDOWN] }, 
+      Mapping { from: vec![CAPSLOCK, N], to: vec![LEFTCTRL, LEFT] }, 
+      Mapping { from: vec![CAPSLOCK, COMMA], to: vec![LEFTCTRL, RIGHT] }
+    ],
+    no_repeat_keys: Vec::new()
+  } 
 }
 
 fn _easy_symbols() -> Layout {
@@ -80,14 +83,20 @@ fn _easy_symbols() -> Layout {
   mappings.append(&mut other_mappings);
   mappings.append(&mut char_mappings);
   
-  Layout(mappings)
+  Layout {
+    mappings: mappings,
+    no_repeat_keys: Vec::new()
+  }
 }
 
 fn _caps_q_for_esc() -> Layout {
-  Layout(vec![
-    Mapping { from: vec![CAPSLOCK], to: vec![] },
-    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC] }
-  ])
+  Layout {
+    mappings: vec![
+      Mapping { from: vec![CAPSLOCK], to: vec![] },
+      Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC] }
+    ],
+    no_repeat_keys: Vec::new()
+  }
 }
 
 fn _easy_symbols_tab_for_movement() -> Layout {
@@ -142,7 +151,10 @@ fn _easy_symbols_tab_for_movement() -> Layout {
   all_mappings.append(&mut other_mappings);
   all_mappings.append(&mut char_mappings);
   
-  Layout(all_mappings)
+  Layout {
+    mappings: all_mappings,
+    no_repeat_keys: Vec::new()
+  }
 }
 
 fn _super_dvorak() -> Layout {
@@ -204,6 +216,9 @@ fn _super_dvorak() -> Layout {
   all_mappings.append(&mut other_mappings);
   all_mappings.append(&mut char_mappings);
   
-  Layout(all_mappings)
+  Layout {
+    mappings: all_mappings,
+    no_repeat_keys: Vec::new()
+  }
 }
 
