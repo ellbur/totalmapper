@@ -1,21 +1,13 @@
 
 // vim: shiftwidth=2
 
-use std::path::Path;
 use nix::Error::Sys;
 use nix::errno::Errno::ENODEV;
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::Mode;
-use nix::unistd::{read, write};
-use nix::Error;
+use nix::unistd::read;
 use libc::{input_event};
 use std::mem::size_of;
-use uinput_sys::{ui_set_evbit, EV_SYN, EV_KEY, EV_MSC, ui_dev_create, ui_set_keybit, KEY_MAX};
-use crate::struct_ser::StructSerializer;
-use std::os::unix::io::RawFd;
-use nix::ioctl_write_int;
-use crate::keys::{Event};
-use num_traits::FromPrimitive;
 use crate::struct_de::StructDeserializer;
 
 pub fn run_monitor_raw(dev_file: &str) {
