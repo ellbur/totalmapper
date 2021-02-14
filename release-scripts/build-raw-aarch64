@@ -1,0 +1,33 @@
+#!/usr/bin/rakudo
+
+# vim: ft=perl6
+
+use FindBin;
+
+my $here = Bin();
+my $repo-root = $here.add('..');
+
+my $raw_building_dir = $repo-root.add('raw-building');
+my $version_rs_file = $repo-root.add('src/version.rs');
+my $exe_source = $repo-root.add('target/aarch64-unknown-linux-musl/release/totalmapper');
+
+my $version;
+given slurp $version_rs_file {
+  when /pub\sconst\sVERSION\:\s\&str\s\=\s\"(.*)\"\;/ { $version = $0; }
+  default { die "Didn't match" }
+}
+
+run </bin/rm -rf>, $raw_building_dir;
+$raw_building_dir.mkdir;
+
+my $tree_root = $raw_building_dir.add("totalmapper-static-linux-aarch64-$version");
+$tree_root.mkdir;
+
+run <cargo build --release --target aarch64-unknown-linux-musl>, cwd => $repo-root;
+
+my $exe_sink = $tree_root.add('totalmapper');
+$exe_source.copy: $exe_sink;
+
+my $archive_file = $raw_building_dir.add: "totalmapper-static-linux-aarch64-$version.tar.gz";
+run <tar czf>, $archive_file, $tree_root.basename, cwd => $raw_building_dir;
+

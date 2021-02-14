@@ -5,26 +5,28 @@
 use FindBin;
 
 my $here = Bin();
-my $deb_building_dir = $here.add('deb-building');
+my $repo-root = $here.add('..');
+
+my $version_rs_file = $repo-root.add('src/version.rs');
+my $deb_building_dir = $repo-root.add('deb-building');
+my $exe_source = $repo-root.add('target/x86_64-unknown-linux-gnu/release/totalmapper');
+
 my $tree_root = $deb_building_dir.add('totalmapper');
 my $control_file = $tree_root.add('DEBIAN/control');
+my $exe_sink = $tree_root.add('usr/bin/totalmapper');
 
-my $version_file = $here.add('version');
-my $version = (slurp $version_file).trim;
+my $version;
+given slurp $version_rs_file {
+  when /pub\sconst\sVERSION\:\s\&str\s\=\s\"(.*)\"\;/ { $version = $0; }
+  default { die "Didn't match" }
+}
 
-my $version_rs_file = $here.add('src/version.rs');
-my $version_rs_fh = open $version_rs_file, :w;
-$version_rs_fh.print: "pub const VERSION: &str = \"$version\";\n";
-$version_rs_fh.close;
-
-run <cargo build --release>, cwd => $here;
+run <cargo build --release --target x86_64-unknown-linux-gnu>, cwd => $repo-root;
 
 my $installed_size_text = (run <du -s>, $tree_root, :out).out.slurp(:close);
 unless ($installed_size_text.match: /\s*(\d+)<|w>.*/) { die("Didn't match") }
 my $installed_size = $0;
 
-my $exe_source = $here.add('target/release/totalmapper');
-my $exe_sink = $tree_root.add('usr/bin/totalmapper');
 $exe_source.copy: $exe_sink;
 
 my $control_content = qq:to/END/;
