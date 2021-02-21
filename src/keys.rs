@@ -3,6 +3,7 @@
  
 use serde::{Deserialize, Serialize};
 pub use crate::key_codes::KeyCode; 
+use std::default::Default;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Event {
@@ -17,12 +18,37 @@ pub use Event::Released;
 pub struct Mapping {
   pub from: Vec<KeyCode>,
   pub to: Vec<KeyCode>,
+  #[serde(default = "normal_repeat")]
+  pub repeat: Repeat
+}
+
+impl Default for Mapping {
+  fn default() -> Self {
+    Mapping {
+      from: vec![],
+      to: vec![],
+      repeat: Repeat::Normal
+    }
+  }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Repeat {
+  Normal,
+  Disabled,
+  Special {
+    key: KeyCode,
+    delay_ms: i32,
+    interval_ms: i32
+  }
+}
+
+pub fn normal_repeat() -> Repeat {
+  Repeat::Normal
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Layout {
-  pub mappings: Vec<Mapping>,
-  #[serde(default = "Vec::new")]
-  pub no_repeat_keys: Vec<KeyCode>
+  pub mappings: Vec<Mapping>
 }
 

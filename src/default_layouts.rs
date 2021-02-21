@@ -6,6 +6,7 @@ use crate::keys::{Layout, Mapping, KeyCode};
 use KeyCode::*;
 use crate::layout_generation::{USKeyboardLayout, make_us_mappings};
 use lazy_static::lazy_static;
+use std::default::Default;
 
 lazy_static! {
   pub static ref DEFAULT_LAYOUTS: HashMap<String, &'static Layout> = {
@@ -30,19 +31,18 @@ lazy_static! {
 fn _caps_lock_for_movement() -> Layout {
   Layout {
     mappings: vec![
-      Mapping { from: vec![CAPSLOCK], to: vec![] },
-      Mapping { from: vec![CAPSLOCK, J], to: vec![LEFT] }, 
-      Mapping { from: vec![CAPSLOCK, I], to: vec![UP] }, 
-      Mapping { from: vec![CAPSLOCK, K], to: vec![DOWN] }, 
-      Mapping { from: vec![CAPSLOCK, L], to: vec![RIGHT] }, 
-      Mapping { from: vec![CAPSLOCK, H], to: vec![HOME] }, 
-      Mapping { from: vec![CAPSLOCK, SEMICOLON], to: vec![END] }, 
-      Mapping { from: vec![CAPSLOCK, U], to: vec![PAGEUP] }, 
-      Mapping { from: vec![CAPSLOCK, M], to: vec![PAGEDOWN] }, 
-      Mapping { from: vec![CAPSLOCK, N], to: vec![LEFTCTRL, LEFT] }, 
-      Mapping { from: vec![CAPSLOCK, COMMA], to: vec![LEFTCTRL, RIGHT] }
-    ],
-    no_repeat_keys: Vec::new()
+      Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
+      Mapping { from: vec![CAPSLOCK, J], to: vec![LEFT], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, I], to: vec![UP], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, K], to: vec![DOWN], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, L], to: vec![RIGHT], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, H], to: vec![HOME], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, SEMICOLON], to: vec![END], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, U], to: vec![PAGEUP], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, M], to: vec![PAGEDOWN], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, N], to: vec![LEFTCTRL, LEFT], ..Default::default() }, 
+      Mapping { from: vec![CAPSLOCK, COMMA], to: vec![LEFTCTRL, RIGHT], ..Default::default() }
+    ]
   } 
 }
 
@@ -76,7 +76,7 @@ fn _easy_symbols() -> Layout {
   
   let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT]);
   let mut other_mappings = vec![
-    Mapping { from: vec![CAPSLOCK], to: vec![] },
+    Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
   ];
   
   let mut mappings = Vec::new();
@@ -84,18 +84,16 @@ fn _easy_symbols() -> Layout {
   mappings.append(&mut char_mappings);
   
   Layout {
-    mappings: mappings,
-    no_repeat_keys: Vec::new()
+    mappings: mappings
   }
 }
 
 fn _caps_q_for_esc() -> Layout {
   Layout {
     mappings: vec![
-      Mapping { from: vec![CAPSLOCK], to: vec![] },
-      Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC] }
-    ],
-    no_repeat_keys: Vec::new()
+      Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
+      Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC], ..Default::default() }
+    ]
   }
 }
 
@@ -130,21 +128,21 @@ fn _easy_symbols_tab_for_movement() -> Layout {
   let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT]);
   
   let mut other_mappings = vec![
-    Mapping { from: vec![TAB], to: vec![] },
-    Mapping { from: vec![TAB, J], to: vec![LEFT] }, 
-    Mapping { from: vec![TAB, I], to: vec![UP] }, 
-    Mapping { from: vec![TAB, K], to: vec![DOWN] }, 
-    Mapping { from: vec![TAB, L], to: vec![RIGHT] }, 
-    Mapping { from: vec![TAB, H], to: vec![HOME] }, 
-    Mapping { from: vec![TAB, SEMICOLON], to: vec![END] }, 
-    Mapping { from: vec![TAB, U], to: vec![PAGEUP] }, 
-    Mapping { from: vec![TAB, M], to: vec![PAGEDOWN] }, 
-    Mapping { from: vec![TAB, N], to: vec![LEFTCTRL, LEFT] }, 
-    Mapping { from: vec![TAB, COMMA], to: vec![LEFTCTRL, RIGHT] },
+    Mapping { from: vec![TAB], to: vec![], ..Default::default() },
+    Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() }, 
+    Mapping { from: vec![TAB, I], to: vec![UP], ..Default::default() }, 
+    Mapping { from: vec![TAB, K], to: vec![DOWN], ..Default::default() }, 
+    Mapping { from: vec![TAB, L], to: vec![RIGHT], ..Default::default() }, 
+    Mapping { from: vec![TAB, H], to: vec![HOME], ..Default::default() }, 
+    Mapping { from: vec![TAB, SEMICOLON], to: vec![END], ..Default::default() }, 
+    Mapping { from: vec![TAB, U], to: vec![PAGEUP], ..Default::default() }, 
+    Mapping { from: vec![TAB, M], to: vec![PAGEDOWN], ..Default::default() }, 
+    Mapping { from: vec![TAB, N], to: vec![LEFTCTRL, LEFT], ..Default::default() }, 
+    Mapping { from: vec![TAB, COMMA], to: vec![LEFTCTRL, RIGHT], ..Default::default() },
     
-    Mapping { from: vec![CAPSLOCK], to: vec![] },
-    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC] },
-    Mapping { from: vec![BACKSLASH], to: vec![TAB] },
+    Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
+    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC], ..Default::default() },
+    Mapping { from: vec![BACKSLASH], to: vec![TAB], ..Default::default() },
   ];
   
   let mut all_mappings = Vec::new();
@@ -152,8 +150,7 @@ fn _easy_symbols_tab_for_movement() -> Layout {
   all_mappings.append(&mut char_mappings);
   
   Layout {
-    mappings: all_mappings,
-    no_repeat_keys: Vec::new()
+    mappings: all_mappings
   }
 }
 
@@ -188,39 +185,39 @@ fn _super_dvorak() -> Layout {
   let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA]);
   
   let mut other_mappings = vec![
-    Mapping { from: vec![U], to: vec![F14, G] },
-    Mapping { from: vec![I], to: vec![F15, C] },
-    Mapping { from: vec![H], to: vec![F16, D] },
-    Mapping { from: vec![J], to: vec![F17, H] },
-    Mapping { from: vec![K], to: vec![F18, T] },
-    Mapping { from: vec![L], to: vec![F19, N] },
-    Mapping { from: vec![SEMICOLON], to: vec![F20, S] },
-    Mapping { from: vec![N], to: vec![F21, B] },
-    Mapping { from: vec![M], to: vec![F22, M] },
-    Mapping { from: vec![COMMA], to: vec![F23, W] },
+    Mapping { from: vec![U], to: vec![G, F14], ..Default::default() },
+    Mapping { from: vec![I], to: vec![C, F15], ..Default::default() },
+    Mapping { from: vec![H], to: vec![D, F16], ..Default::default() },
+    Mapping { from: vec![J], to: vec![H, F17], ..Default::default() },
+    Mapping { from: vec![K], to: vec![T, F18], ..Default::default() },
+    Mapping { from: vec![L], to: vec![N, T], ..Default::default() },
+    Mapping { from: vec![SEMICOLON], to: vec![S, F20], ..Default::default() },
+    Mapping { from: vec![N], to: vec![B, F21], ..Default::default() },
+    Mapping { from: vec![M], to: vec![M, F22], ..Default::default() },
+    Mapping { from: vec![COMMA], to: vec![W, F23], ..Default::default() },
     
-    Mapping { from: vec![TAB], to: vec![] },
-    Mapping { from: vec![TAB, J], to: vec![LEFT] }, 
-    Mapping { from: vec![TAB, I], to: vec![UP] }, 
-    Mapping { from: vec![TAB, K], to: vec![DOWN] }, 
-    Mapping { from: vec![TAB, L], to: vec![RIGHT] }, 
-    Mapping { from: vec![TAB, H], to: vec![HOME] }, 
-    Mapping { from: vec![TAB, SEMICOLON], to: vec![END] }, 
-    Mapping { from: vec![TAB, U], to: vec![PAGEUP] }, 
-    Mapping { from: vec![TAB, M], to: vec![PAGEDOWN] }, 
-    Mapping { from: vec![TAB, N], to: vec![LEFTCTRL, LEFT] }, 
-    Mapping { from: vec![TAB, COMMA], to: vec![LEFTCTRL, RIGHT] },
+    Mapping { from: vec![TAB], to: vec![], ..Default::default() },
+    Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() }, 
+    Mapping { from: vec![TAB, I], to: vec![UP], ..Default::default() }, 
+    Mapping { from: vec![TAB, K], to: vec![DOWN], ..Default::default() }, 
+    Mapping { from: vec![TAB, L], to: vec![RIGHT], ..Default::default() }, 
+    Mapping { from: vec![TAB, H], to: vec![HOME], ..Default::default() }, 
+    Mapping { from: vec![TAB, SEMICOLON], to: vec![END], ..Default::default() }, 
+    Mapping { from: vec![TAB, U], to: vec![PAGEUP], ..Default::default() }, 
+    Mapping { from: vec![TAB, M], to: vec![PAGEDOWN], ..Default::default() }, 
+    Mapping { from: vec![TAB, N], to: vec![LEFTCTRL, LEFT], ..Default::default() }, 
+    Mapping { from: vec![TAB, COMMA], to: vec![LEFTCTRL, RIGHT], ..Default::default() },
     
-    Mapping { from: vec![CAPSLOCK], to: vec![] },
-    Mapping { from: vec![RIGHTALT], to: vec![] },
-    Mapping { from: vec![LEFTMETA], to: vec![] },
+    Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
+    Mapping { from: vec![RIGHTALT], to: vec![], ..Default::default() },
+    Mapping { from: vec![LEFTMETA], to: vec![], ..Default::default() },
     
-    Mapping { from: vec![LEFTMETA, Q], to: vec![ESC] },
-    Mapping { from: vec![RIGHTALT, Q], to: vec![ESC] },
-    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC] },
+    Mapping { from: vec![LEFTMETA, Q], to: vec![ESC], ..Default::default() },
+    Mapping { from: vec![RIGHTALT, Q], to: vec![ESC], ..Default::default() },
+    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC], ..Default::default() },
     
-    Mapping { from: vec![BACKSLASH], to: vec![TAB] },
-    Mapping { from: vec![GRAVE], to: vec![LEFTMETA] },
+    Mapping { from: vec![BACKSLASH], to: vec![TAB], ..Default::default() },
+    Mapping { from: vec![GRAVE], to: vec![LEFTMETA], ..Default::default() },
   ];
   
   let mut all_mappings = Vec::new();
@@ -229,7 +226,6 @@ fn _super_dvorak() -> Layout {
   
   Layout {
     mappings: all_mappings,
-    no_repeat_keys: vec![GRAVE, K1, K2, K3, K4, K5, K6, K7, K8, K9, K0, MINUS, EQUAL, Q, W, E, R, T, Y, U, I, O, P, LEFTBRACE, RIGHTBRACE, BACKSLASH, A, S, D, F, G, H, J, K, L, SEMICOLON, APOSTROPHE, Z, X, C, V, B, N, M, COMMA, DOT, SLASH]
   }
 }
 

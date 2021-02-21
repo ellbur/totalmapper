@@ -8,6 +8,7 @@ use crate::keys::{KeyCode, Mapping};
 use std::collections::HashMap;
 use KeyCode::*;
 use lazy_static::lazy_static;
+use std::default::Default;
 
 pub struct USKeyboardLayout {
   pub tilde: char,
@@ -194,24 +195,24 @@ fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_do
                   if alt_gr_down {
                     for sk in shift_keys {
                       for ak in alt_gr_keys {
-                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone() });
+                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone(), ..Default::default() });
                       }
                     }
                   }
                   else {
                     for sk in shift_keys {
-                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone() });
+                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone(), ..Default::default() });
                     }
                   }
                 }
                 else {
                   if alt_gr_down {
                     for ak in alt_gr_keys {
-                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone() });
+                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone(), ..Default::default() });
                     }
                   }
                   else {
-                    res.push(Mapping { from: vec![*k], to: keys.clone() });
+                    res.push(Mapping { from: vec![*k], to: keys.clone(), ..Default::default() });
                   }
                 }
               }

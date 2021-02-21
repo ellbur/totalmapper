@@ -163,7 +163,8 @@ fn do_remapping_loop_one_device(rw: &mut RW, layout: Layout) -> Result<(), Strin
               }
               Ok(ev_in) => {
                 if !in_tablet_mode {
-                  let evs_out = mapper.step(ev_in);
+                  let step_out = mapper.step(ev_in);
+                  let evs_out = step_out.events;
 
                   for ev in evs_out {
                     rw.w.send(ev).map_err(|e| format!("write() to synthetic keyboard failed with {}", e))?;

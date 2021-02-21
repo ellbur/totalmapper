@@ -140,7 +140,14 @@ impl DevInputWriter {
     send_type_code_value(4, 4, code as i32)?;
     send_type_code_value(1, code, value)?;
     send_type_code_value(0, 0, 0)?;
-
+    
+    //match ev {
+    //  Event::Pressed(_) => (),
+    //  Event::Released(_) => {
+    //    thread::sleep(time::Duration::from_millis(2));
+    //  },
+    //};
+    
     Ok(())
   }
 }
