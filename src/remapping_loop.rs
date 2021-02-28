@@ -17,8 +17,7 @@ use crate::tablet_mode_switch_reader::TableModeEvent::{On, Off};
 use std::thread;
 use std::time;
 use crate::keys::KeyCode;
-use time::Duration;
-use std::convert::TryInto;
+use time::{Duration, Instant};
 use crate::keys::Event;
 use crate::keys::Event::{Pressed, Released};
 use crate::key_transforms::ResultingRepeat;
@@ -112,17 +111,14 @@ struct RW {
   t: Option<TabletModeSwitchReader>
 }
   
+#[derive(Debug)]
 enum WorkingRepeat {
   Idle,
-  PreRepeat {
-    key: KeyCode,
-    delay_ms: i32,
-    interval_ms: i32
-  },
   Repeating {
     key: KeyCode,
+    next_wakeup: Instant,
     interval_ms: i32
-  }
+  },
 }
 
 #[derive(Debug)]
@@ -144,7 +140,7 @@ trait Driver {
   fn poll(&mut self, registry: &mut Self::PollRegistry, timeout: Option<Duration>) -> Result<PollResult, String>;
   fn next_keyboard(&mut self) -> Result<Next<Event>, String>;
   fn next_tablet(&mut self) -> Result<Next<TableModeEvent>, String>;
-  fn send(&mut self, ev: &Event) -> Result<(), String>;
+  fn send(&mut self, evs: &Vec<Event>) -> Result<(), String>;
 }
 
 struct RealDriver {
@@ -206,7 +202,12 @@ impl Driver for RealDriver {
           }
         }
         
-        Ok(PollResult::DeviceEvent(res))
+        if res.is_empty() {
+          Ok(PollResult::TimedOut)
+        }
+        else {
+          Ok(PollResult::DeviceEvent(res))
+        }
       },
       Err(e) => {
         match e.kind() {
@@ -247,8 +248,8 @@ impl Driver for RealDriver {
     }
   }
   
-  fn send(&mut self, ev: &Event) -> Result<(), String> {
-    match self.rw.w.send(ev) {
+  fn send(&mut self, evs: &Vec<Event>) -> Result<(), String> {
+    match self.rw.w.send(evs) {
       Err(e) => {
         Err(format!("write() to synthetic keyboard failed with {}", e))
       },
@@ -269,8 +270,15 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
     loop {
       let timeout = match working_repeat {
         WorkingRepeat::Idle => None,
-        WorkingRepeat::PreRepeat { key: _, delay_ms, interval_ms: _ } => Some(Duration::from_millis(delay_ms.try_into().unwrap())),
-        WorkingRepeat::Repeating { key: _, interval_ms } => Some(Duration::from_millis(interval_ms.try_into().unwrap()))
+        WorkingRepeat::Repeating { key: _, next_wakeup, interval_ms: _ } => {
+          let now = Instant::now();
+          if now >= next_wakeup {
+            Some(Duration::from_millis(1))
+          }
+          else {
+            Some(next_wakeup - now)
+          }
+        }
       };
       
       let mut restart_count: i32 = 0;
@@ -280,22 +288,14 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
             WorkingRepeat::Idle => {
               // Well that's weird. I guess just keep going?
             },
-            WorkingRepeat::PreRepeat { key, delay_ms: _, interval_ms } => {
+            WorkingRepeat::Repeating { key, next_wakeup, interval_ms } => {
               if !in_tablet_mode {
-                for ev in &[Pressed(key), Released(key)] {
-                  driver.send(ev)?;
-                }
-                working_repeat = WorkingRepeat::Repeating { key: key, interval_ms: interval_ms };
-              }
-              else {
-                working_repeat = WorkingRepeat::Idle;
-              }
-            },
-            WorkingRepeat::Repeating { key, interval_ms: _ } => {
-              if !in_tablet_mode {
-                for ev in &[Pressed(key), Released(key)] {
-                  driver.send(ev)?;
-                }
+                driver.send(&vec![Pressed(key), Released(key)])?;
+                working_repeat = WorkingRepeat::Repeating {
+                  key: key,
+                  next_wakeup: next_wakeup + Duration::from_millis(interval_ms as u64),
+                  interval_ms: interval_ms
+                };
               }
               else {
                 working_repeat = WorkingRepeat::Idle;
@@ -309,7 +309,6 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
             // Avoid burning the CPU if we keep getting interrupted for some reason
             thread::sleep(Duration::from_millis(1000 * (1 << restart_count)));
           }
-          println!("totalmapper: poll() interrupted, restarting.");
         },
         PollResult::DeviceEvent(dev_evs) => {
           for dev_ev in dev_evs {
@@ -328,13 +327,15 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                         let step_out = mapper.step(ev_in);
                         let evs_out = step_out.events;
 
-                        for ev in evs_out {
-                          driver.send(&ev)?;
+                        if !evs_out.is_empty() {
+                          driver.send(&evs_out)?;
                         }
                         
                         working_repeat = match step_out.repeat {
-                          Some(ResultingRepeat { key, delay_ms, interval_ms }) => WorkingRepeat::PreRepeat {
-                            key: key, delay_ms: delay_ms, interval_ms: interval_ms
+                          Some(ResultingRepeat { key, delay_ms, interval_ms }) => WorkingRepeat::Repeating {
+                            key: key,
+                            next_wakeup: Instant::now() + Duration::from_millis(delay_ms as u64),
+                            interval_ms: interval_ms
                           },
                           None => WorkingRepeat::Idle
                         };
@@ -357,15 +358,17 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                         On => {
                           in_tablet_mode = true;
                           working_repeat = WorkingRepeat::Idle;
-                          for ev in mapper.release_all() {
-                            driver.send(&ev)?;
+                          let release_events = mapper.release_all();
+                          if !release_events.is_empty() {
+                            driver.send(&release_events)?;
                           }
                         },
                         Off => {
                           in_tablet_mode = false;
                           working_repeat = WorkingRepeat::Idle;
-                          for ev in mapper.release_all() {
-                            driver.send(&ev)?;
+                          let release_events = mapper.release_all();
+                          if !release_events.is_empty() {
+                            driver.send(&release_events)?;
                           }
                         }
                       }
@@ -403,7 +406,7 @@ mod tests {
       result: Next<TableModeEvent>
     },
     Send {
-      ev: Event
+      evs: Vec<Event>
     }
   }
   
@@ -443,7 +446,19 @@ mod tests {
           panic!("poll() on empty op list")
         },
         Some(TestOp::Poll { timeout: timeout_should, result }) => {
-          assert_eq!(timeout, timeout_should);
+          match (timeout, timeout_should) {
+            (None, None) => (),
+            (None, Some(_)) => {
+            },
+            (Some(_), None) => {
+            },
+            (Some(d1), Some(d2)) => {
+              let error = (d1.as_millis() as i32) - (d2.as_millis() as i32);
+              if error > 10 || error < -10 {
+                panic!("Timeout was {:?}, should be {:?}", timeout, timeout_should);
+              }
+            }
+          }
           Ok(result)
         },
         Some(other) =>  {
@@ -480,17 +495,17 @@ mod tests {
       }
     }
     
-    fn send(&mut self, ev: &Event) -> Result<(), String> {
+    fn send(&mut self, evs: &Vec<Event>) -> Result<(), String> {
       match self.ops.pop_front() {
         None => {
           panic!("send() on empty op list")
         },
-        Some(TestOp::Send { ev: ev_should }) => {
-          assert_eq!(*ev, ev_should);
+        Some(TestOp::Send { evs: evs_should }) => {
+          assert_eq!(*evs, evs_should);
           Ok(())
         },
         Some(other) => {
-          panic!("send() called but should have called {:?}", other)
+          panic!("send({:?}) called but should have called {:?}", evs, other)
         }
       }
     }
@@ -508,11 +523,11 @@ mod tests {
     ops.push_back(TestOp::RegisterPoll);
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(A)) });
-    ops.push_back(TestOp::Send { ev: Pressed(B) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(B)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Released(A)) });
-    ops.push_back(TestOp::Send { ev: Released(B) });
+    ops.push_back(TestOp::Send { evs: vec![Released(B)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
     let mut driver = TestDriver { ops: ops };
@@ -559,13 +574,12 @@ mod tests {
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(LEFTSHIFT)) });
-    ops.push_back(TestOp::Send { ev: Pressed(LEFTSHIFT) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(LEFTSHIFT)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(A)) });
-    ops.push_back(TestOp::Send { ev: Pressed(A) });
-    ops.push_back(TestOp::Send { ev: Released(A) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(A), Released(A)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
@@ -574,25 +588,22 @@ mod tests {
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(B)) });
-    ops.push_back(TestOp::Send { ev: Pressed(B) });
-    ops.push_back(TestOp::Send { ev: Released(B) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(B), Released(B)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(130)), result: PollResult::TimedOut });
-    ops.push_back(TestOp::Send { ev: Pressed(C) });
-    ops.push_back(TestOp::Send { ev: Released(C) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(C), Released(C)] });
     
-    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(30)), result: PollResult::TimedOut });
-    ops.push_back(TestOp::Send { ev: Pressed(C) });
-    ops.push_back(TestOp::Send { ev: Released(C) });
+    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(160)), result: PollResult::TimedOut });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(C), Released(C)] });
     
-    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(30)), result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(190)), result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Released(B)) });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Released(LEFTSHIFT)) });
-    ops.push_back(TestOp::Send { ev: Released(LEFTSHIFT) });
+    ops.push_back(TestOp::Send { evs: vec![Released(LEFTSHIFT)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
     let mut driver = TestDriver { ops: ops };
@@ -614,13 +625,12 @@ mod tests {
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(LEFTSHIFT)) });
-    ops.push_back(TestOp::Send { ev: Pressed(LEFTSHIFT) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(LEFTSHIFT)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(A)) });
-    ops.push_back(TestOp::Send { ev: Pressed(A) });
-    ops.push_back(TestOp::Send { ev: Released(A) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(A), Released(A)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
@@ -629,17 +639,15 @@ mod tests {
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(B)) });
-    ops.push_back(TestOp::Send { ev: Pressed(B) });
-    ops.push_back(TestOp::Send { ev: Released(B) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(B), Released(B)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(130)), result: PollResult::TimedOut });
-    ops.push_back(TestOp::Send { ev: Pressed(C) });
-    ops.push_back(TestOp::Send { ev: Released(C) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(C), Released(C)] });
     
-    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(30)), result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(160)), result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(D)) });
-    ops.push_back(TestOp::Send { ev: Pressed(D) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(D)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
     
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });

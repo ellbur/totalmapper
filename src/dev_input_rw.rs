@@ -110,36 +110,37 @@ impl DevInputWriter {
     })
   }
   
-  pub fn send(self: &mut DevInputWriter, ev: &Event) -> Result<(), Error> {
-    let k = match ev {
-      Event::Pressed(k) => k,
-      Event::Released(k) => k,
+  pub fn send(self: &mut DevInputWriter, evs: &Vec<Event>) -> Result<(), Error> {
+    let mut input_event_data = StructSerializer {
+      sink: Vec::new()
     };
     
-    let value = match ev {
-      Event::Pressed(_) => 1,
-      Event::Released(_) => 0
-    };
-    
-    let code = (*k) as u16;
-    
-    let send_type_code_value = |type_, code, value| {
-      let mut input_event_data = StructSerializer {
-        sink: Vec::new()
-      };
-      
+    let mut send_type_code_value = |type_, code, value| {
       input_event_data.add_i64(0);
       input_event_data.add_i64(0);
       input_event_data.add_u16(type_);
       input_event_data.add_u16(code);
       input_event_data.add_i32(value);
-      
-      write(self.fd, &input_event_data.sink)
     };
-  
-    send_type_code_value(4, 4, code as i32)?;
-    send_type_code_value(1, code, value)?;
-    send_type_code_value(0, 0, 0)?;
+      
+    for ev in evs {
+      let k = match ev {
+        Event::Pressed(k) => k,
+        Event::Released(k) => k,
+      };
+      
+      let value = match ev {
+        Event::Pressed(_) => 1,
+        Event::Released(_) => 0
+      };
+      
+      let code = (*k) as u16;
+      
+      send_type_code_value(1, code, value);
+    }
+    send_type_code_value(0, 0, 0);
+    
+    write(self.fd, &input_event_data.sink)?;
     
     Ok(())
   }

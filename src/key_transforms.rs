@@ -51,6 +51,7 @@ fn init_state() -> State {
   };
 }
 
+#[derive(Debug)]
 struct SeqMapping {
   from: Vec<KeyCode>,
   to: Vec<Vec<KeyCode>>,
@@ -236,7 +237,7 @@ impl Mapper {
 }
 
 fn is_action_key(k: &KeyCode) -> bool {
-  use KeyCode::{LEFTSHIFT, RIGHTSHIFT, LEFTMETA, RIGHTMETA, LEFTCTRL, RIGHTCTRL};
+  use KeyCode::{LEFTSHIFT, RIGHTSHIFT, LEFTMETA, RIGHTMETA, LEFTCTRL, RIGHTCTRL, LEFTALT, RIGHTALT};
   
   match k {
     LEFTSHIFT => false,
@@ -245,6 +246,8 @@ fn is_action_key(k: &KeyCode) -> bool {
     RIGHTMETA => false,
     LEFTCTRL => false,
     RIGHTCTRL => false,
+    LEFTALT => false,
+    RIGHTALT => false,
     _ => true
   }
 }

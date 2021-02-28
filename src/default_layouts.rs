@@ -185,16 +185,16 @@ fn _super_dvorak() -> Layout {
   let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA], true);
   
   let mut other_mappings = vec![
-    Mapping { from: vec![U], to: vec![G], repeat: Repeat::Special { key: F13, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![I], to: vec![C], repeat: Repeat::Special { key: F14, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![H], to: vec![D], repeat: Repeat::Special { key: F15, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![J], to: vec![H], repeat: Repeat::Special { key: F16, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![K], to: vec![T], repeat: Repeat::Special { key: F17, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![L], to: vec![N], repeat: Repeat::Special { key: F18, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![SEMICOLON], to: vec![S], repeat: Repeat::Special { key: F19, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![N], to: vec![B], repeat: Repeat::Special { key: F20, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![M], to: vec![M], repeat: Repeat::Special { key: F21, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
-    Mapping { from: vec![COMMA], to: vec![W], repeat: Repeat::Special { key: F22, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![U], to: vec![G], repeat: Repeat::Special { key: F13, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![I], to: vec![C], repeat: Repeat::Special { key: F15, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![H], to: vec![D], repeat: Repeat::Special { key: F16, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![J], to: vec![H], repeat: Repeat::Special { key: F17, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![K], to: vec![T], repeat: Repeat::Special { key: F19, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![L], to: vec![N], repeat: Repeat::Special { key: F20, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![SEMICOLON], to: vec![S], repeat: Repeat::Special { key: F21, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![N], to: vec![B], repeat: Repeat::Special { key: F22, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![M], to: vec![M], repeat: Repeat::Special { key: F23, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![COMMA], to: vec![W], repeat: Repeat::Special { key: F24, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
     
     Mapping { from: vec![TAB], to: vec![], ..Default::default() },
     Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() }, 
@@ -220,6 +220,12 @@ fn _super_dvorak() -> Layout {
     Mapping { from: vec![GRAVE], to: vec![LEFTMETA], ..Default::default() },
     
     Mapping { from: vec![SPACE], to: vec![SPACE], repeat: Repeat::Disabled, ..Default::default() },
+    
+    Mapping { from: vec![LEFTALT, GRAVE, J], to: vec![LEFTALT, LEFTMETA, H], repeat: Repeat::Normal, ..Default::default() },
+    Mapping { from: vec![LEFTALT, GRAVE, L], to: vec![LEFTALT, LEFTMETA, N], repeat: Repeat::Normal, ..Default::default() },
+    
+    Mapping { from: vec![LEFTALT, J], to: vec![LEFTALT, H], repeat: Repeat::Normal, ..Default::default() },
+    Mapping { from: vec![LEFTALT, L], to: vec![LEFTALT, N], repeat: Repeat::Normal, ..Default::default() },
   ];
   
   let mut all_mappings = Vec::new();
