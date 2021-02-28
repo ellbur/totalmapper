@@ -4,7 +4,7 @@
 
 // vim: shiftwidth=2
 
-use crate::keys::{KeyCode, Mapping};
+use crate::keys::{KeyCode, Mapping, Repeat};
 use std::collections::HashMap;
 use KeyCode::*;
 use lazy_static::lazy_static;
@@ -172,11 +172,20 @@ lazy_static! {
   static ref US_SHIFT_KEYS: Vec<KeyCode> = vec![LEFTSHIFT, RIGHTSHIFT];
 }
 
-fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_down: bool, alt_gr_down: bool, shift_keys: &Vec<KeyCode>, alt_gr_keys: &Vec<KeyCode>) -> Vec<Mapping> {
+fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_down: bool, alt_gr_down: bool, shift_keys: &Vec<KeyCode>, alt_gr_keys: &Vec<KeyCode>, disable_repeats: bool) -> Vec<Mapping> {
   let mut key_iter = hardware_keys.iter();
   let mut char_iter = desired_chars.chars();
   
   let mut res = Vec::new();
+  
+  let repeat = {
+    if disable_repeats {
+      Repeat::Disabled
+    }
+    else {
+      Repeat::Normal
+    }
+  };
   
   loop {
     let next_key = key_iter.next();
@@ -195,24 +204,24 @@ fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_do
                   if alt_gr_down {
                     for sk in shift_keys {
                       for ak in alt_gr_keys {
-                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone(), ..Default::default() });
+                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone(), repeat: repeat, ..Default::default() });
                       }
                     }
                   }
                   else {
                     for sk in shift_keys {
-                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone(), ..Default::default() });
+                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone(), repeat: repeat, ..Default::default() });
                     }
                   }
                 }
                 else {
                   if alt_gr_down {
                     for ak in alt_gr_keys {
-                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone(), ..Default::default() });
+                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone(), repeat: repeat, ..Default::default() });
                     }
                   }
                   else {
-                    res.push(Mapping { from: vec![*k], to: keys.clone(), ..Default::default() });
+                    res.push(Mapping { from: vec![*k], to: keys.clone(), repeat: repeat, ..Default::default() });
                   }
                 }
               }
@@ -226,36 +235,36 @@ fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_do
   res
 }
 
-pub fn make_us_mappings(layout: USKeyboardLayout, alt_gr_keys: &Vec<KeyCode>) -> Vec<Mapping> {
+pub fn make_us_mappings(layout: USKeyboardLayout, alt_gr_keys: &Vec<KeyCode>, disable_repeats: bool) -> Vec<Mapping> {
   let shift_keys = &*US_SHIFT_KEYS;
   let us_keycodes = &*US_KEYCODES;
   
   let mut mappings = Vec::new();
   
-  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde.to_string(),              false, false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde_shift.to_string(),        true,  false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde_alt_gr.to_string(),       false, true,  &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde_shift_alt_gr.to_string(), true,  true,  &shift_keys, alt_gr_keys));
+  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde.to_string(),              false, false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde_shift.to_string(),        true,  false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde_alt_gr.to_string(),       false, true,  &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&vec![us_keycodes.tilde], layout.tilde_shift_alt_gr.to_string(), true,  true,  &shift_keys, alt_gr_keys, disable_repeats));
   
-  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1,              false, false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1_shift,        true,  false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1_alt_gr,       false, true,  &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys));
+  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1,              false, false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1_shift,        true,  false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1_alt_gr,       false, true,  &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_1, layout.row_1_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys, disable_repeats));
   
-  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q,              false, false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q_shift,        true,  false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q_alt_gr,       false, true,  &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys));
+  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q,              false, false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q_shift,        true,  false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q_alt_gr,       false, true,  &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_q, layout.row_q_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys, disable_repeats));
   
-  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a,              false, false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a_shift,        true,  false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a_alt_gr,       false, true,  &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys));
+  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a,              false, false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a_shift,        true,  false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a_alt_gr,       false, true,  &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_a, layout.row_a_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys, disable_repeats));
   
-  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z,              false, false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z_shift,        true,  false, &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z_alt_gr,       false, true,  &shift_keys, alt_gr_keys));
-  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys));
+  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z,              false, false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z_shift,        true,  false, &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z_alt_gr,       false, true,  &shift_keys, alt_gr_keys, disable_repeats));
+  mappings.append(&mut string_mappings(&us_keycodes.row_z, layout.row_z_shift_alt_gr, true,  true,  &shift_keys, alt_gr_keys, disable_repeats));
   
   mappings
 }

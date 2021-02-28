@@ -110,7 +110,7 @@ impl DevInputWriter {
     })
   }
   
-  pub fn send(self: &mut DevInputWriter, ev: Event) -> Result<(), Error> {
+  pub fn send(self: &mut DevInputWriter, ev: &Event) -> Result<(), Error> {
     let k = match ev {
       Event::Pressed(k) => k,
       Event::Released(k) => k,
@@ -121,7 +121,7 @@ impl DevInputWriter {
       Event::Released(_) => 0
     };
     
-    let code = k as u16;
+    let code = (*k) as u16;
     
     let send_type_code_value = |type_, code, value| {
       let mut input_event_data = StructSerializer {
@@ -140,13 +140,6 @@ impl DevInputWriter {
     send_type_code_value(4, 4, code as i32)?;
     send_type_code_value(1, code, value)?;
     send_type_code_value(0, 0, 0)?;
-    
-    //match ev {
-    //  Event::Pressed(_) => (),
-    //  Event::Released(_) => {
-    //    thread::sleep(time::Duration::from_millis(2));
-    //  },
-    //};
     
     Ok(())
   }

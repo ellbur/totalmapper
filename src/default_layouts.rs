@@ -2,7 +2,7 @@
 // vim: shiftwidth=2
 
 use std::collections::HashMap;
-use crate::keys::{Layout, Mapping, KeyCode};
+use crate::keys::{Layout, Mapping, KeyCode, Repeat};
 use KeyCode::*;
 use crate::layout_generation::{USKeyboardLayout, make_us_mappings};
 use lazy_static::lazy_static;
@@ -74,7 +74,7 @@ fn _easy_symbols() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT]);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT], false);
   let mut other_mappings = vec![
     Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
   ];
@@ -125,7 +125,7 @@ fn _easy_symbols_tab_for_movement() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT]);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT], false);
   
   let mut other_mappings = vec![
     Mapping { from: vec![TAB], to: vec![], ..Default::default() },
@@ -182,19 +182,19 @@ fn _super_dvorak() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA]);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA], true);
   
   let mut other_mappings = vec![
-    Mapping { from: vec![U], to: vec![G, F14], ..Default::default() },
-    Mapping { from: vec![I], to: vec![C, F15], ..Default::default() },
-    Mapping { from: vec![H], to: vec![D, F16], ..Default::default() },
-    Mapping { from: vec![J], to: vec![H, F17], ..Default::default() },
-    Mapping { from: vec![K], to: vec![T, F18], ..Default::default() },
-    Mapping { from: vec![L], to: vec![N, T], ..Default::default() },
-    Mapping { from: vec![SEMICOLON], to: vec![S, F20], ..Default::default() },
-    Mapping { from: vec![N], to: vec![B, F21], ..Default::default() },
-    Mapping { from: vec![M], to: vec![M, F22], ..Default::default() },
-    Mapping { from: vec![COMMA], to: vec![W, F23], ..Default::default() },
+    Mapping { from: vec![U], to: vec![G], repeat: Repeat::Special { key: F13, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![I], to: vec![C], repeat: Repeat::Special { key: F14, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![H], to: vec![D], repeat: Repeat::Special { key: F15, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![J], to: vec![H], repeat: Repeat::Special { key: F16, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![K], to: vec![T], repeat: Repeat::Special { key: F17, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![L], to: vec![N], repeat: Repeat::Special { key: F18, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![SEMICOLON], to: vec![S], repeat: Repeat::Special { key: F19, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![N], to: vec![B], repeat: Repeat::Special { key: F20, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![M], to: vec![M], repeat: Repeat::Special { key: F21, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
+    Mapping { from: vec![COMMA], to: vec![W], repeat: Repeat::Special { key: F22, delay_ms: 180, interval_ms: 50 }, ..Default::default() },
     
     Mapping { from: vec![TAB], to: vec![], ..Default::default() },
     Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() }, 
@@ -218,6 +218,8 @@ fn _super_dvorak() -> Layout {
     
     Mapping { from: vec![BACKSLASH], to: vec![TAB], ..Default::default() },
     Mapping { from: vec![GRAVE], to: vec![LEFTMETA], ..Default::default() },
+    
+    Mapping { from: vec![SPACE], to: vec![SPACE], repeat: Repeat::Disabled, ..Default::default() },
   ];
   
   let mut all_mappings = Vec::new();

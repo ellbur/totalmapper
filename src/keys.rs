@@ -32,7 +32,7 @@ impl Default for Mapping {
   }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 pub enum Repeat {
   Normal,
   Disabled,
