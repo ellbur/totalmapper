@@ -74,7 +74,7 @@ fn _easy_symbols() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT], false);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT], false, false);
   let mut other_mappings = vec![
     Mapping { from: vec![CAPSLOCK], to: vec![], ..Default::default() },
   ];
@@ -125,7 +125,7 @@ fn _easy_symbols_tab_for_movement() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT], false);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT], false, false);
   
   let mut other_mappings = vec![
     Mapping { from: vec![TAB], to: vec![], ..Default::default() },
@@ -182,7 +182,7 @@ fn _super_dvorak() -> Layout {
     row_z_shift_alt_gr: "".to_string(),
   };
   
-  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA], true);
+  let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA], true, true);
   
   let mut other_mappings = vec![
     Mapping { from: vec![U], to: vec![G], repeat: Repeat::Special { key: F13, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
@@ -195,6 +195,28 @@ fn _super_dvorak() -> Layout {
     Mapping { from: vec![N], to: vec![B], repeat: Repeat::Special { key: F22, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
     Mapping { from: vec![M], to: vec![M], repeat: Repeat::Special { key: F23, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
     Mapping { from: vec![COMMA], to: vec![W], repeat: Repeat::Special { key: F24, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    
+    Mapping { from: vec![LEFTSHIFT, U], to: vec![LEFTSHIFT, G], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, I], to: vec![LEFTSHIFT, C], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, H], to: vec![LEFTSHIFT, D], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, J], to: vec![LEFTSHIFT, H], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, K], to: vec![LEFTSHIFT, T], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, L], to: vec![LEFTSHIFT, N], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, SEMICOLON], to: vec![LEFTSHIFT, S], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, N], to: vec![LEFTSHIFT, B], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, M], to: vec![LEFTSHIFT, M], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, COMMA], to: vec![LEFTSHIFT, W], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
+    
+    Mapping { from: vec![RIGHTSHIFT, U], to: vec![RIGHTSHIFT, G], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, I], to: vec![RIGHTSHIFT, C], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, H], to: vec![RIGHTSHIFT, D], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, J], to: vec![RIGHTSHIFT, H], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, K], to: vec![RIGHTSHIFT, T], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, L], to: vec![RIGHTSHIFT, N], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, SEMICOLON], to: vec![RIGHTSHIFT, S], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, N], to: vec![RIGHTSHIFT, B], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, M], to: vec![RIGHTSHIFT, M], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, COMMA], to: vec![RIGHTSHIFT, W], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
     
     Mapping { from: vec![TAB], to: vec![], ..Default::default() },
     Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() }, 

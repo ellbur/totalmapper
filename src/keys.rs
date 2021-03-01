@@ -19,7 +19,9 @@ pub struct Mapping {
   pub from: Vec<KeyCode>,
   pub to: Vec<KeyCode>,
   #[serde(default = "normal_repeat")]
-  pub repeat: Repeat
+  pub repeat: Repeat,
+  #[serde(default = "Vec::new")]
+  pub absorbing: Vec<KeyCode>
 }
 
 impl Default for Mapping {
@@ -27,7 +29,8 @@ impl Default for Mapping {
     Mapping {
       from: vec![],
       to: vec![],
-      repeat: Repeat::Normal
+      repeat: Repeat::Normal,
+      absorbing: vec![]
     }
   }
 }

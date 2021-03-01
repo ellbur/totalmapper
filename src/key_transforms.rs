@@ -10,9 +10,9 @@ fn final_key(trigger: &Vec<KeyCode>) -> KeyCode {
   return trigger[trigger.len() - 1];
 }
 
-fn is_supported(trigger: &Vec<KeyCode>, pressed_keys: &Vec<KeyCode>, new_key: &KeyCode) -> bool {
+fn is_supported(trigger: &Vec<KeyCode>, pressed_keys: &Vec<KeyCode>, absorbed_keys: &Vec<KeyCode>, new_key: &KeyCode) -> bool {
   for k in trigger {
-    if !(pressed_keys.contains(&k) || k == new_key) {
+    if !((pressed_keys.contains(&k) && !absorbed_keys.contains(&k)) || k == new_key) {
       return false;
     }
   }
@@ -28,18 +28,13 @@ fn fails_when_released(trigger: &Vec<KeyCode>, key: &KeyCode) -> bool {
   return false;
 }
 
-#[derive(Debug, Clone)]
-struct ActiveMapping {
-  from: Vec<KeyCode>,
-  to: Vec<KeyCode>
-}
-
 #[derive(Debug)]
 struct State {
   input_pressed_keys: Vec<KeyCode>,
-  active_mappings: Vec<ActiveMapping>,
+  active_mappings: Vec<Mapping>,
   pass_through_keys: Vec<KeyCode>,
   mapped_output_keys: Vec<KeyCode>,
+  mapped_absorbed_keys: Vec<KeyCode>
 }
 
 fn init_state() -> State {
@@ -48,49 +43,12 @@ fn init_state() -> State {
     active_mappings: Vec::new(),
     pass_through_keys: Vec::new(),
     mapped_output_keys: Vec::new(),
+    mapped_absorbed_keys: Vec::new()
   };
 }
 
-#[derive(Debug)]
-struct SeqMapping {
-  from: Vec<KeyCode>,
-  to: Vec<Vec<KeyCode>>,
-  repeat: Repeat
-}
-
 struct HashedLayout {
-  mappings: HashMap<KeyCode, Vec<SeqMapping>>
-}
-
-fn to_seq_mapping(m: &Mapping) -> SeqMapping {
-  let mut working_modifiers: Vec<KeyCode> = Vec::new();
-  let mut working_to: Vec<Vec<KeyCode>> = Vec::new();
-  
-  if m.to.len() > 0 {
-    for k in &m.to[0 .. m.to.len()-1] {
-      if is_action_key(k) {
-        let mut combined = working_modifiers.clone();
-        combined.push(*k);
-        working_to.push(combined);
-      }
-      else {
-        working_modifiers.push(*k);
-      }
-    }
-  }
-
-  if m.to.len() > 0 {
-    let k = &m.to[m.to.len() - 1];
-    let mut combined = working_modifiers.clone();
-    combined.push(*k);
-    working_to.push(combined);
-  }
-  
-  SeqMapping {
-    from: m.from.clone(),
-    to: working_to,
-    repeat: m.repeat.clone()
-  }
+  mappings: HashMap<KeyCode, Vec<Mapping>>
 }
 
 fn trigger_priority(t1: &Vec<KeyCode>, t2: &Vec<KeyCode>) -> Ordering {
@@ -113,12 +71,12 @@ fn trigger_priority(t1: &Vec<KeyCode>, t2: &Vec<KeyCode>) -> Ordering {
   }
 }
 
-fn mapping_priority(m1: &SeqMapping, m2: &SeqMapping) -> Ordering {
+fn mapping_priority(m1: &Mapping, m2: &Mapping) -> Ordering {
   return trigger_priority(&m1.from, &m2.from);
 }
 
 fn make_hashed_layout(layout: &Layout) -> HashedLayout {
-  let mut mappings: HashMap<KeyCode, Vec<SeqMapping>> = HashMap::new();
+  let mut mappings: HashMap<KeyCode, Vec<Mapping>> = HashMap::new();
 
   for mapping in &layout.mappings {
     for i in 0 .. mapping.from.len() {
@@ -140,14 +98,13 @@ fn make_hashed_layout(layout: &Layout) -> HashedLayout {
   
   for mapping in &layout.mappings {
     let last = final_key(&mapping.from);
-    let seq_mapping = to_seq_mapping(&mapping);
     
     match mappings.get_mut(&last) {
       None => {
-        mappings.insert(last, vec![seq_mapping]);
+        mappings.insert(last, vec![mapping.clone()]);
       },
       Some(existing) => {
-        existing.push(seq_mapping);
+        existing.push(mapping.clone());
         existing.sort_by(mapping_priority);
       }
     }
@@ -182,6 +139,11 @@ impl StepResult {
       events: vec![],
       repeat: None
     }
+  }
+  
+  fn append(&mut self, mut other: StepResult) {
+    self.repeat = other.repeat;
+    self.events.append(&mut other.events);
   }
 }
 
@@ -252,7 +214,7 @@ fn is_action_key(k: &KeyCode) -> bool {
   }
 }
 
-fn is_action_mapping(m: &ActiveMapping) -> bool {
+fn is_action_mapping(m: &Mapping) -> bool {
   if m.to.len() == 0 {
     false
   }
@@ -262,7 +224,40 @@ fn is_action_mapping(m: &ActiveMapping) -> bool {
   }
 }
 
-fn add_new_mapping(state: &mut State, m: &ActiveMapping) -> Vec<Event> {
+fn release_action_mappings(state: &mut State) -> Vec<Event> {
+  let mut events = Vec::new();
+  
+  let mut keys_to_release: Vec<KeyCode> = Vec::new();
+  for exsting_mapping in &state.active_mappings {
+    if is_action_mapping(exsting_mapping) {
+      for mod_key in exsting_mapping.to.iter().rev() {
+        if state.mapped_output_keys.contains(mod_key) {
+          keys_to_release.push(*mod_key);
+        }
+      }
+    }
+  }
+  
+  for k in &state.pass_through_keys {
+    if is_action_key(k) {
+      keys_to_release.push(*k);
+    }
+  }
+  
+  for k in &keys_to_release {
+    events.push(Released(*k));
+  }
+  state.mapped_output_keys.retain(|&k| {
+    !keys_to_release.contains(&k)
+  });
+  state.pass_through_keys.retain(|&k| {
+    !keys_to_release.contains(&k)
+  });
+  
+  events
+}
+
+fn add_new_mapping(state: &mut State, m: &Mapping) -> StepResult {
   let mut events: Vec<Event> = Vec::new();
   
   let pass_through_keys = &mut state.pass_through_keys;
@@ -284,46 +279,73 @@ fn add_new_mapping(state: &mut State, m: &ActiveMapping) -> Vec<Event> {
     }
   });
   
-  let mut keys_to_release: Vec<KeyCode> = Vec::new();
-  for exsting_mapping in &state.active_mappings {
-    if is_action_mapping(exsting_mapping) {
-      for mod_key in &exsting_mapping.to {
-        if state.mapped_output_keys.contains(mod_key) {
-          keys_to_release.push(*mod_key);
+  if is_action_mapping(m) {
+    events.append(&mut release_action_mappings(state));
+    events.append(&mut release_absorbed_keys(state));
+  }
+  
+  for new_key in &m.to {
+    if is_action_key(new_key) {
+      if state.mapped_output_keys.contains(new_key) {
+        events.push(Released(*new_key));
+        events.push(Pressed(*new_key));
+      }
+      else {
+        if state.pass_through_keys.contains(new_key) {
+          events.push(Released(*new_key));
+          events.push(Pressed(*new_key));
+          state.pass_through_keys.retain(|k2| k2 != new_key);
+          state.mapped_output_keys.push(*new_key);
+        }
+        else {
+          events.push(Pressed(*new_key));
+          state.mapped_output_keys.push(*new_key);
         }
       }
     }
-  }
-  
-  for k in &keys_to_release {
-    events.push(Released(*k));
-  }
-  state.mapped_output_keys.retain(|&k| {
-    !keys_to_release.contains(&k)
-  });
-  
-  for new_key in &m.to {
-    if state.mapped_output_keys.contains(new_key) {
-      events.push(Released(*new_key));
-      events.push(Pressed(*new_key));
-    }
     else {
-      if state.pass_through_keys.contains(new_key) {
-        events.push(Released(*new_key));
-        events.push(Pressed(*new_key));
-        state.pass_through_keys.retain(|k2| k2 != new_key);
-        state.mapped_output_keys.push(*new_key);
-      }
-      else {
+      if !state.mapped_output_keys.contains(new_key) && !state.pass_through_keys.contains(new_key) {
         events.push(Pressed(*new_key));
         state.mapped_output_keys.push(*new_key);
       }
+    }
+  }
+  
+  for absorbed_key in &m.absorbing {
+    if !state.mapped_absorbed_keys.contains(absorbed_key) {
+      state.mapped_absorbed_keys.push(*absorbed_key);
     }
   }
   
   state.active_mappings.push(m.clone());
   
-  events
+  let mut res = StepResult {
+    events: events,
+    repeat: None
+  };
+  
+  match m.repeat {
+    Repeat::Normal => {
+      // OK, nothing to do
+    },
+    Repeat::Disabled => {
+      // Release all action keys to prevent repeating
+      res.events.append(&mut release_all_action_keys(state));
+    },
+    Repeat::Special { key, delay_ms, interval_ms } => {
+      // First release action keys
+      res.events.append(&mut release_all_action_keys(state));
+
+      // Now tell it what key to repeat
+      res.repeat = Some(ResultingRepeat {
+        key: key,
+        delay_ms: delay_ms,
+        interval_ms: interval_ms
+      });
+    }
+  };
+        
+  res
 }
 
 fn release_all_action_keys(state: &mut State) -> Vec<Event> {
@@ -352,6 +374,37 @@ fn release_all_action_keys(state: &mut State) -> Vec<Event> {
   to_release.iter().map(|k| Released(*k)).collect()
 }
 
+fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
+  let mut events: Vec<Event> = Vec::new();
+  
+  let mut to_remove: Vec<KeyCode> = Vec::new();
+  to_remove.append(&mut state.mapped_absorbed_keys);
+  
+  for k in to_remove {
+    {
+      let mut i: isize = state.active_mappings.len() as isize - 1;
+      while i >= 0 {
+        if fails_when_released(&state.active_mappings[i as usize].from, &k) {
+          events.append(&mut remove_mapping(state, i as usize, k));
+        }
+        i -= 1;
+      }
+    }
+    
+    for i in (0 .. state.pass_through_keys.len()).rev() {
+      if state.pass_through_keys[i] == k {
+        events.push(Released(k));
+        state.pass_through_keys.remove(i);
+        break;
+      }
+    }
+    
+    state.input_pressed_keys.retain(|k2| *k2 != k);
+  }
+  
+  events
+}
+
 fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   let mappings = &mapper.layout.mappings;
   let mut state = &mut mapper.state;
@@ -360,40 +413,12 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   
   let mut any_hit: bool = false;
   
+  state.mapped_absorbed_keys.retain(|k2| *k2 != k);
+  
   for mappings in mappings.get(&k) {
     for mapping in mappings {
-      if is_supported(&mapping.from, &state.input_pressed_keys, &k) {
-        for to in &mapping.to {
-          let active_mapping = ActiveMapping {
-            from: mapping.from.clone(),
-            to: (*to).clone()
-          };
-          
-          let mut mapping_events = add_new_mapping(state, &active_mapping);
-          res.events.append(&mut mapping_events);
-        }
-        
-        match mapping.repeat {
-          Repeat::Normal => {
-            // OK, nothing to do
-          },
-          Repeat::Disabled => {
-            // Release all action keys to prevent repeating
-            res.events.append(&mut release_all_action_keys(&mut state));
-          },
-          Repeat::Special { key, delay_ms, interval_ms } => {
-            // First release action keys
-            res.events.append(&mut release_all_action_keys(&mut state));
-            
-            // Now tell it what key to repeat
-            res.repeat = Some(ResultingRepeat {
-              key: key,
-              delay_ms: delay_ms,
-              interval_ms: interval_ms
-            });
-          }
-        };
-        
+      if is_supported(&mapping.from, &state.input_pressed_keys, &state.mapped_absorbed_keys, &k) {
+        res.append(add_new_mapping(&mut state, &mapping));
         any_hit = true;
         break;
       }
@@ -414,7 +439,12 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   }
   
   if !any_hit {
-    if !state.pass_through_keys.contains(&k){
+    if !state.pass_through_keys.contains(&k) {
+      if is_action_key(&k) {
+        res.events.append(&mut release_action_mappings(&mut state));
+        res.events.append(&mut release_absorbed_keys(&mut state));
+      }
+      
       res.events.push(Pressed(k));
       state.pass_through_keys.push(k);
     }
@@ -556,7 +586,7 @@ mod tests {
     
     assert_eq!(empty, mapper.step(Pressed(CAPSLOCK)).events);
     assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(EQUAL)], mapper.step(Pressed(M)).events);
-    assert_eq!(vec![Released(LEFTSHIFT), Released(EQUAL), Pressed(EQUAL)], mapper.step(Pressed(U)).events);
+    assert_eq!(vec![Released(EQUAL), Released(LEFTSHIFT), Pressed(EQUAL)], mapper.step(Pressed(U)).events);
   }
   
   #[test]
@@ -641,6 +671,21 @@ mod tests {
     assert_eq!(StepResult { events: vec![], repeat: None }, mapper.step(Released(A)));
     assert_eq!(StepResult { events: vec![Pressed(B), Released(B)], repeat: Some(ResultingRepeat { key: C, delay_ms: 130, interval_ms: 30 }) }, mapper.step(Pressed(B)));
     assert_eq!(StepResult { events: vec![], repeat: None }, mapper.step(Released(B)));
+  }
+
+  #[test]
+  fn absorbing_test_1() {
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![LEFTSHIFT, A], to: vec![LEFTSHIFT, A], absorbing: vec![LEFTSHIFT], ..Default::default() },
+      ]
+    };
+    
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: None }, mapper.step(Pressed(LEFTSHIFT)));
+    assert_eq!(StepResult { events: vec![Pressed(A)], repeat: None }, mapper.step(Pressed(A)));
+    assert_eq!(StepResult { events: vec![Released(A), Released(LEFTSHIFT), Pressed(B)], repeat: None }, mapper.step(Pressed(B)));
   }
 }
 
