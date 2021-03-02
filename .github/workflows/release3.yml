@@ -24,8 +24,10 @@ jobs:
         run: ./release-scripts/build-raw-amd64
       - name: Build raw aarch64
         run: ./release-scripts/build-raw-aarch64
-      - name: Build debs
-        run: ./release-scripts/build-deb-in-docker
+      - name: Build Focal
+        run: ./release-scripts/build-focal
+      - name: Build Groovy
+        run: ./release-scripts/build-groovy
       - name: Make release
         uses: softprops/action-gh-release@v0.1.5
         with:
