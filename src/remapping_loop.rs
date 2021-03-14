@@ -332,12 +332,13 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                         }
                         
                         working_repeat = match step_out.repeat {
-                          Some(ResultingRepeat { key, delay_ms, interval_ms }) => WorkingRepeat::Repeating {
+                          ResultingRepeat::Repeating { key, delay_ms, interval_ms } => WorkingRepeat::Repeating {
                             key: key,
                             next_wakeup: Instant::now() + Duration::from_millis(delay_ms as u64),
                             interval_ms: interval_ms
                           },
-                          None => WorkingRepeat::Idle
+                          ResultingRepeat::Disabled => WorkingRepeat::Idle,
+                          ResultingRepeat::NoChange => working_repeat
                         };
                       }
                     }

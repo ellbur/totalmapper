@@ -34,17 +34,21 @@ struct State {
   active_mappings: Vec<Mapping>,
   pass_through_keys: Vec<KeyCode>,
   mapped_output_keys: Vec<KeyCode>,
-  mapped_absorbed_keys: Vec<KeyCode>
+  mapped_absorbed_keys: Vec<KeyCode>,
+  repeating_trigger: Option<KeyCode>
 }
 
-fn init_state() -> State {
-  return State {
-    input_pressed_keys: Vec::new(),
-    active_mappings: Vec::new(),
-    pass_through_keys: Vec::new(),
-    mapped_output_keys: Vec::new(),
-    mapped_absorbed_keys: Vec::new()
-  };
+impl State {
+  fn init() -> State {
+    return State {
+      input_pressed_keys: Vec::new(),
+      active_mappings: Vec::new(),
+      pass_through_keys: Vec::new(),
+      mapped_output_keys: Vec::new(),
+      mapped_absorbed_keys: Vec::new(),
+      repeating_trigger: None,
+    };
+  }
 }
 
 struct HashedLayout {
@@ -121,23 +125,27 @@ pub struct Mapper {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct ResultingRepeat {
-  pub key: KeyCode,
-  pub delay_ms: i32,
-  pub interval_ms: i32
+pub enum ResultingRepeat {
+  Disabled,
+  NoChange,
+  Repeating {
+    key: KeyCode,
+    delay_ms: i32,
+    interval_ms: i32
+  },
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct StepResult {
   pub events: Vec<Event>,
-  pub repeat: Option<ResultingRepeat>
+  pub repeat: ResultingRepeat
 }
 
 impl StepResult {
   fn empty() -> StepResult {
     StepResult {
       events: vec![],
-      repeat: None
+      repeat: ResultingRepeat::Disabled
     }
   }
   
@@ -151,7 +159,7 @@ impl Mapper {
   pub fn for_layout(layout: &Layout) -> Mapper {
     Mapper {
       layout: make_hashed_layout(layout),
-      state: init_state()
+      state: State::init()
     }
   }
   
@@ -166,7 +174,7 @@ impl Mapper {
         else {
           StepResult {
             events: vec![],
-            repeat: None
+            repeat: ResultingRepeat::NoChange
           }
         }
       },
@@ -177,7 +185,7 @@ impl Mapper {
         else {
           StepResult {
             events: vec![],
-            repeat: None
+            repeat: ResultingRepeat::NoChange
           }
         }
       }
@@ -257,7 +265,7 @@ fn release_action_mappings(state: &mut State) -> Vec<Event> {
   events
 }
 
-fn add_new_mapping(state: &mut State, m: &Mapping) -> StepResult {
+fn add_new_mapping(state: &mut State, new_key: &KeyCode, m: &Mapping) -> StepResult {
   let mut events: Vec<Event> = Vec::new();
   
   let pass_through_keys = &mut state.pass_through_keys;
@@ -321,7 +329,7 @@ fn add_new_mapping(state: &mut State, m: &Mapping) -> StepResult {
   
   let mut res = StepResult {
     events: events,
-    repeat: None
+    repeat: ResultingRepeat::Disabled
   };
   
   match m.repeat {
@@ -337,11 +345,15 @@ fn add_new_mapping(state: &mut State, m: &Mapping) -> StepResult {
       res.events.append(&mut release_all_action_keys(state));
 
       // Now tell it what key to repeat
-      res.repeat = Some(ResultingRepeat {
+      res.repeat = ResultingRepeat::Repeating {
         key: key,
         delay_ms: delay_ms,
         interval_ms: interval_ms
-      });
+      };
+      
+      // Save the key that triggered it so we can stop
+      // the mapping when the key is released
+      state.repeating_trigger = Some(*new_key);
     }
   };
         
@@ -414,11 +426,12 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   let mut any_hit: bool = false;
   
   state.mapped_absorbed_keys.retain(|k2| *k2 != k);
+  state.repeating_trigger = None;
   
   for mappings in mappings.get(&k) {
     for mapping in mappings {
       if is_supported(&mapping.from, &state.input_pressed_keys, &state.mapped_absorbed_keys, &k) {
-        res.append(add_new_mapping(&mut state, &mapping));
+        res.append(add_new_mapping(&mut state, &k, &mapping));
         any_hit = true;
         break;
       }
@@ -533,9 +546,22 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     old_key != k
   });
   
+  let repeat = match state.repeating_trigger {
+    Some(k2) => {
+      if k == k2 {
+        state.repeating_trigger = None;
+        ResultingRepeat::Disabled
+      }
+      else {
+        ResultingRepeat::NoChange
+      }
+    },
+    None => ResultingRepeat::Disabled
+  };
+  
   StepResult {
     events: events,
-    repeat: None
+    repeat: repeat
   }
 }
 
@@ -631,10 +657,10 @@ mod tests {
     
     let mut mapper = Mapper::for_layout(&layout);
     
-    assert_eq!(StepResult { events: vec![Pressed(A), Released(A)], repeat: None }, mapper.step(Pressed(A)));
-    assert_eq!(StepResult { events: vec![], repeat: None }, mapper.step(Released(A)));
-    assert_eq!(StepResult { events: vec![Pressed(B)], repeat: None }, mapper.step(Pressed(B)));
-    assert_eq!(StepResult { events: vec![Released(B)], repeat: None }, mapper.step(Released(B)));
+    assert_eq!(StepResult { events: vec![Pressed(A), Released(A)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
+    assert_eq!(StepResult { events: vec![], repeat: ResultingRepeat::Disabled }, mapper.step(Released(A)));
+    assert_eq!(StepResult { events: vec![Pressed(B)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(B)));
+    assert_eq!(StepResult { events: vec![Released(B)], repeat: ResultingRepeat::Disabled }, mapper.step(Released(B)));
   }
   
   #[test]
@@ -648,11 +674,11 @@ mod tests {
     
     let mut mapper = Mapper::for_layout(&layout);
     
-    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: None }, mapper.step(Pressed(LEFTSHIFT)));
-    assert_eq!(StepResult { events: vec![Pressed(A), Released(A)], repeat: None }, mapper.step(Pressed(A)));
-    assert_eq!(StepResult { events: vec![], repeat: None }, mapper.step(Released(A)));
-    assert_eq!(StepResult { events: vec![Pressed(B)], repeat: None }, mapper.step(Pressed(B)));
-    assert_eq!(StepResult { events: vec![Released(B)], repeat: None }, mapper.step(Released(B)));
+    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(LEFTSHIFT)));
+    assert_eq!(StepResult { events: vec![Pressed(A), Released(A)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
+    assert_eq!(StepResult { events: vec![], repeat: ResultingRepeat::Disabled }, mapper.step(Released(A)));
+    assert_eq!(StepResult { events: vec![Pressed(B)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(B)));
+    assert_eq!(StepResult { events: vec![Released(B)], repeat: ResultingRepeat::Disabled }, mapper.step(Released(B)));
   }
   
   #[test]
@@ -666,11 +692,27 @@ mod tests {
     
     let mut mapper = Mapper::for_layout(&layout);
     
-    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: None }, mapper.step(Pressed(LEFTSHIFT)));
-    assert_eq!(StepResult { events: vec![Pressed(A), Released(A)], repeat: None }, mapper.step(Pressed(A)));
-    assert_eq!(StepResult { events: vec![], repeat: None }, mapper.step(Released(A)));
-    assert_eq!(StepResult { events: vec![Pressed(B), Released(B)], repeat: Some(ResultingRepeat { key: C, delay_ms: 130, interval_ms: 30 }) }, mapper.step(Pressed(B)));
-    assert_eq!(StepResult { events: vec![], repeat: None }, mapper.step(Released(B)));
+    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(LEFTSHIFT)));
+    assert_eq!(StepResult { events: vec![Pressed(A), Released(A)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
+    assert_eq!(StepResult { events: vec![], repeat: ResultingRepeat::Disabled }, mapper.step(Released(A)));
+    assert_eq!(StepResult { events: vec![Pressed(B), Released(B)], repeat: ResultingRepeat::Repeating { key: C, delay_ms: 130, interval_ms: 30 } }, mapper.step(Pressed(B)));
+    assert_eq!(StepResult { events: vec![], repeat: ResultingRepeat::Disabled }, mapper.step(Released(B)));
+  }
+
+  #[test]
+  fn overlapping_repeat_test_1() {
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![A], to: vec![C], repeat: Repeat::Normal, ..Default::default() },
+        Mapping { from: vec![B], to: vec![D], repeat: Repeat::Special { key: E, delay_ms: 130, interval_ms: 30 }, ..Default::default() },
+      ]
+    };
+    
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    assert_eq!(StepResult { events: vec![Pressed(C)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
+    assert_eq!(StepResult { events: vec![Released(C), Pressed(D), Released(D)], repeat: ResultingRepeat::Repeating { key: E, delay_ms: 130, interval_ms: 30 } }, mapper.step(Pressed(B)));
+    assert_eq!(StepResult { events: vec![], repeat: ResultingRepeat::NoChange }, mapper.step(Released(A)));
   }
 
   #[test]
@@ -683,9 +725,9 @@ mod tests {
     
     let mut mapper = Mapper::for_layout(&layout);
     
-    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: None }, mapper.step(Pressed(LEFTSHIFT)));
-    assert_eq!(StepResult { events: vec![Pressed(A)], repeat: None }, mapper.step(Pressed(A)));
-    assert_eq!(StepResult { events: vec![Released(A), Released(LEFTSHIFT), Pressed(B)], repeat: None }, mapper.step(Pressed(B)));
+    assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(LEFTSHIFT)));
+    assert_eq!(StepResult { events: vec![Pressed(A)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
+    assert_eq!(StepResult { events: vec![Released(A), Released(LEFTSHIFT), Pressed(B)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(B)));
   }
 }
 
