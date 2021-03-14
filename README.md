@@ -5,7 +5,26 @@
 
 It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use any key as a modifier, enabling more complex layouts than can be achieved with the usual combination of alts, shifts, and controls.
 
+## Features
+
+* Use any key as a modifier
+* Use any number of modifiers
+* Write layouts in a simple JSON syntax that is easy to generate programmatically
+* Run it on any Linux platform, including Chrome OS (in developer mode)
+* Run it on X and Wayland and with all window managers and GUI frameworks
+* Change repeat behavior per-key (e.g., disable repeat or repeat with a different code than the initial press)
+* Prevent TYping LIke THis by making Shift only apply to one key
+
 # Installation
+
+## Packages
+
+* Ubuntu amd64:
+    * [`totalmapper_1.3.2-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.2-focal_amd64.deb)
+    * [`totalmapper_1.3.2-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.2-groovy_amd64.deb)
+* Self-contained Linux binaries (useful for Chrome OS):
+    * [`totalmapper-static-linux-amd64-1.3.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-amd64-1.3.2.tar.gz)
+    * [`totalmapper-static-linux-aarch64-1.3.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-aarch64-1.3.2.tar.gz)
 
 ## From source
 
@@ -13,16 +32,6 @@ With [`cargo`](https://doc.rust-lang.org/cargo/):
 
     cargo build --release
     sudo cp ./target/release/totalmapper /usr/bin
-
-## Packages
-
-* Ubuntu amd64:
-    * [`totalmapper_1.2.2-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.2.2/totalmapper_1.2.2-focal_amd64.deb)
-    * [`totalmapper_1.2.2-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.2.2/totalmapper_1.2.2-groovy_amd64.deb)
-    * [`totalmapper_1.2.2-hirsute_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.2.2/totalmapper_1.2.2-hirsute_amd64.deb)
-* Self-contained Linux binaries (useful for Chrome OS):
-    * [`totalmapper-static-linux-amd64-1.2.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.2.2/totalmapper-static-linux-amd64-1.2.2.tar.gz)
-    * [`totalmapper-static-linux-aarch64-1.2.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.2.2/totalmapper-static-linux-aarch64-1.2.2.tar.gz)
 
 # Running
 
@@ -46,7 +55,7 @@ Define your own layout (see below) and remap your keyboard with:
 
 # Running automatically
 
-    sudo totalmapper add_systemd_service
+    sudo totalmapper add_systemd_service --default-layout caps-for-movement
 
 # Defining layouts
 
@@ -74,7 +83,47 @@ The names of keys are taken from [the Linux header](https://github.com/torvalds/
 
 You can use any key as a modifier. You don't have to tell totalmapper which keys are modifiers; simply creating a mapping that uses the key in combination with another makes it act like a modifier.
 
-But be careful that if you want to use a key as a modifier that normally has another function, you will want to map the key by itself to `[]`, as in the example above.
+Be careful that if you want to use a key as a modifier that normally has another function, you will want to map the key by itself to `[]`, as in the example above.
+
+## Remapping
+
+A basic mapping maps some combination of keys to another combination of keys:
+
+```json
+{ "from" : ["LEFTCTRL", "C"], "to": ["LEFTALT", "1"] }
+```
+
+The above mapping will be triggered when the user presses the left control key and then taps the 'C' key, and will make it as if the left alt were pressed while tapping '1'.
+
+## Custom repeat
+
+### Disabling repeat
+
+You can use `totalmapper` to make specific keys or combinations of keys not repeat:
+
+```json
+{ "from": [ "RIGHTSHIFT", "SLASH" ], "to": [ "LEFTSHIFT", "Z" ], "repeat": "Disabled" }
+```
+
+### Changing the repeat code
+
+You can make a key repeat with a different code than the initial press:
+
+```json
+{ "from": [ "SEMICOLON" ], "to": [ "S" ], "repeat": { "Special": { "key": "F21", "delay_ms": 180, "interval_ms": 30 } } }
+```
+
+This will case the first press of the <kbd>;</kbd> key to generate the code for <kbd>S</kbd>, but, if held down, the repeat code will be <kbd>F21</kbd>. This can be used to make a key that repeats in some apps but not others by configuring how those apps treat the repeat code. I personally use it to make Vim movement letters (h, j, k, l) only repeat in Vim normal mode.  
+
+## Preventing extra Shift
+
+If you're like me, you have a tendancy to HOld DOwn SHift TOo LOong, resulting in WOrds LIke THis. `totalmapper` can be used to make a modifier only apply to a single key stroke:
+
+```json
+ { "from": [ "LEFTSHIFT", "L" ], "to": [ "LEFTSHIFT", "N" ], "absorbing": [ "LEFTSHIFT" ] }
+```
+
+The `absorbing` option tells `totalmapper` that after it applies this mapping, it should "absorb" the `LEFTSHIFT` modifier so that it is not used for any subsequent keypresses.
 
 # On Chrome OS
 
@@ -91,4 +140,3 @@ On some devices, the remapped keyboard will not automatically disable in tablet 
     totalmapper remap --dev-file /dev/input/event2 --tablet-mode-switch-device /dev/input/event5 --default-layout caps-for-movement
 
 You can test devices under `/dev/input` with `evtest` to find your tablet mode switch.
-
