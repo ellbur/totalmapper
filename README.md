@@ -12,6 +12,7 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 * Write layouts in a simple JSON syntax that is easy to generate programmatically
 * Run it on any Linux platform, including Chrome OS (in developer mode)
 * Run it on X and Wayland and with all window managers and GUI frameworks
+* Use a consistent layout across remote desktops and virtual machines
 * Change repeat behavior per-key (e.g., disable repeat or repeat with a different code than the initial press)
 * Prevent TYping LIke THis by making Shift only apply to one key
 
