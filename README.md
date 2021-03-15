@@ -116,7 +116,7 @@ You can make a key repeat with a different code than the initial press:
 { "from": [ "SEMICOLON" ], "to": [ "S" ], "repeat": { "Special": { "key": "F21", "delay_ms": 180, "interval_ms": 30 } } }
 ```
 
-This will case the first press of the <kbd>;</kbd> key to generate the code for <kbd>S</kbd>, but, if held down, the repeat code will be <kbd>F21</kbd>. This can be used to make a key that repeats in some apps but not others by configuring how those apps treat the repeat code. I personally use it to make Vim movement letters (h, j, k, l) only repeat in Vim normal mode.  
+This will cause the first press of the <kbd>;</kbd> key to generate the code for <kbd>S</kbd>, but, if held down, the repeat code will be <kbd>F21</kbd>. This can be used to make a key that repeats in some apps but not others by configuring how those apps treat the repeat code. I personally use it to make Vim movement letters (h, j, k, l) only repeat in Vim normal mode.  
 
 ## Preventing extra Shift
 
