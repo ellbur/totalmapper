@@ -20,11 +20,11 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 ## Packages
 
 * Ubuntu amd64:
-    * [`totalmapper_1.3.2-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.2-focal_amd64.deb)
-    * [`totalmapper_1.3.2-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.2-groovy_amd64.deb)
+    * [`totalmapper_1.3.3-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.3-focal_amd64.deb)
+    * [`totalmapper_1.3.3-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.3-groovy_amd64.deb)
 * Self-contained Linux binaries (useful for Chrome OS):
-    * [`totalmapper-static-linux-amd64-1.3.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-amd64-1.3.2.tar.gz)
-    * [`totalmapper-static-linux-aarch64-1.3.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-aarch64-1.3.2.tar.gz)
+    * [`totalmapper-static-linux-amd64-1.3.3.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-amd64-1.3.3.tar.gz)
+    * [`totalmapper-static-linux-aarch64-1.3.3.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-aarch64-1.3.3.tar.gz)
 
 ## From source
 
@@ -54,6 +54,8 @@ Define your own layout (see below) and remap your keyboard with:
     totalmapper remap --layout-file my-layout.json --all-keyboards
 
 # Running automatically
+
+If your system uses `systemd`, you can add a `udev` rule that will automatically run `totalmapper` whenever a new keyboard is plugged in:
 
     sudo totalmapper add_systemd_service --default-layout caps-for-movement
 
@@ -139,4 +141,4 @@ On some devices, the remapped keyboard will not automatically disable in tablet 
 
     totalmapper remap --dev-file /dev/input/event2 --tablet-mode-switch-device /dev/input/event5 --default-layout caps-for-movement
 
-You can test devices under `/dev/input` with `evtest` to find your tablet mode switch.
+You can inspect devices under `/dev/input` with `evtest` to find your tablet mode switch.
