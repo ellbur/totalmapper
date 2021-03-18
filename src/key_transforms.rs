@@ -35,6 +35,7 @@ struct State {
   pass_through_keys: Vec<KeyCode>,
   mapped_output_keys: Vec<KeyCode>,
   mapped_absorbed_keys: Vec<KeyCode>,
+  absorbing_trigger: Option<KeyCode>,
   repeating_trigger: Option<KeyCode>
 }
 
@@ -46,6 +47,7 @@ impl State {
       pass_through_keys: Vec::new(),
       mapped_output_keys: Vec::new(),
       mapped_absorbed_keys: Vec::new(),
+      absorbing_trigger: None,
       repeating_trigger: None,
     };
   }
@@ -114,9 +116,7 @@ fn make_hashed_layout(layout: &Layout) -> HashedLayout {
     }
   }
   
-  return HashedLayout {
-    mappings: mappings
-  };
+  HashedLayout { mappings }
 }
 
 pub struct Mapper {
@@ -289,7 +289,15 @@ fn add_new_mapping(state: &mut State, new_key: &KeyCode, m: &Mapping) -> StepRes
   
   if is_action_mapping(m) {
     events.append(&mut release_action_mappings(state));
-    events.append(&mut release_absorbed_keys(state));
+    let should_absorb = {
+      match &state.absorbing_trigger {
+        Some(absorbing_trigger) => *absorbing_trigger != *new_key,
+        None => true
+      }
+    };
+    if should_absorb {
+      events.append(&mut release_absorbed_keys(state));
+    }
   }
   
   for new_key in &m.to {
@@ -324,11 +332,14 @@ fn add_new_mapping(state: &mut State, new_key: &KeyCode, m: &Mapping) -> StepRes
       state.mapped_absorbed_keys.push(*absorbed_key);
     }
   }
+  if m.absorbing.len() > 0 {
+    state.absorbing_trigger = Some(*new_key);
+  }
   
   state.active_mappings.push(m.clone());
   
   let mut res = StepResult {
-    events: events,
+    events,
     repeat: ResultingRepeat::Disabled
   };
   
@@ -345,11 +356,7 @@ fn add_new_mapping(state: &mut State, new_key: &KeyCode, m: &Mapping) -> StepRes
       res.events.append(&mut release_all_action_keys(state));
 
       // Now tell it what key to repeat
-      res.repeat = ResultingRepeat::Repeating {
-        key: key,
-        delay_ms: delay_ms,
-        interval_ms: interval_ms
-      };
+      res.repeat = ResultingRepeat::Repeating { key, delay_ms, interval_ms };
       
       // Save the key that triggered it so we can stop
       // the mapping when the key is released
@@ -391,6 +398,7 @@ fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
   
   let mut to_remove: Vec<KeyCode> = Vec::new();
   to_remove.append(&mut state.mapped_absorbed_keys);
+  state.absorbing_trigger = None;
   
   for k in to_remove {
     {
@@ -559,10 +567,7 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     None => ResultingRepeat::Disabled
   };
   
-  StepResult {
-    events: events,
-    repeat: repeat
-  }
+  StepResult { events, repeat }
 }
 
 #[cfg(test)]
@@ -728,6 +733,23 @@ mod tests {
     assert_eq!(StepResult { events: vec![Pressed(LEFTSHIFT)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(LEFTSHIFT)));
     assert_eq!(StepResult { events: vec![Pressed(A)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
     assert_eq!(StepResult { events: vec![Released(A), Released(LEFTSHIFT), Pressed(B)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(B)));
+  }
+  
+  #[test]
+  fn absorbing_double_press_test_1() {
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![LEFTSHIFT, A], to: vec![LEFTSHIFT, A], absorbing: vec![LEFTSHIFT], ..Default::default() },
+        Mapping { from: vec![LEFTSHIFT, B], to: vec![LEFTSHIFT, B], absorbing: vec![LEFTSHIFT], ..Default::default() },
+      ]
+    };
+    
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    assert_eq!(vec![Pressed(LEFTSHIFT)], mapper.step(Pressed(LEFTSHIFT)).events);
+    assert_eq!(vec![Pressed(A)], mapper.step(Pressed(A)).events);
+    assert_eq!(vec![Released(A)], mapper.step(Released(A)).events);
+    assert_eq!(vec![Released(LEFTSHIFT), Pressed(B)], mapper.step(Pressed(B)).events);
   }
 }
 
