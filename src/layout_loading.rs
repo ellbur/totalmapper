@@ -63,5 +63,28 @@ mod tests {
       }
     "#).unwrap();
   }
+  
+  #[test]
+  fn load_test_3() {
+    let _layout: Layout = serde_json::from_str(r#"
+      {
+        "mappings": [
+          { "from": [ "CAPSLOCK" ], "to": [] },
+          { "from": [ "CAPSLOCK", "Q" ], "to": [ "ESC" ] }
+        ]
+      }
+    "#).unwrap();
+  }
+  
+  #[test]
+  fn load_test_4() {
+    let _layout: Layout = serde_json::from_str(r#"
+      {
+        "mappings": [
+          { "from": [ "SEMICOLON" ], "to": [ "S" ], "repeat": { "Special": { "keys": ["F21"], "delay_ms": 180, "interval_ms": 30 } } }
+        ]
+      }
+    "#).unwrap();
+  }
 }
 

@@ -115,7 +115,7 @@ struct RW {
 enum WorkingRepeat {
   Idle,
   Repeating {
-    key: KeyCode,
+    keys: Vec<KeyCode>,
     next_wakeup: Instant,
     interval_ms: i32
   },
@@ -270,7 +270,7 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
     loop {
       let timeout = match working_repeat {
         WorkingRepeat::Idle => None,
-        WorkingRepeat::Repeating { key: _, next_wakeup, interval_ms: _ } => {
+        WorkingRepeat::Repeating { keys: _, next_wakeup, interval_ms: _ } => {
           let now = Instant::now();
           if now >= next_wakeup {
             Some(Duration::from_millis(1))
@@ -288,11 +288,18 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
             WorkingRepeat::Idle => {
               // Well that's weird. I guess just keep going?
             },
-            WorkingRepeat::Repeating { key, next_wakeup, interval_ms } => {
+            WorkingRepeat::Repeating { keys, next_wakeup, interval_ms } => {
               if !in_tablet_mode {
-                driver.send(&vec![Pressed(key), Released(key)])?;
+                let mut repeat_send = Vec::new();
+                for key in &keys {
+                  repeat_send.push(Pressed(*key));
+                }
+                for key in (&keys).iter().rev() {
+                  repeat_send.push(Released(*key));
+                }
+                driver.send(&repeat_send)?;
                 working_repeat = WorkingRepeat::Repeating {
-                  key: key,
+                  keys: keys,
                   next_wakeup: next_wakeup + Duration::from_millis(interval_ms as u64),
                   interval_ms: interval_ms
                 };
@@ -332,8 +339,8 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                         }
                         
                         working_repeat = match step_out.repeat {
-                          ResultingRepeat::Repeating { key, delay_ms, interval_ms } => WorkingRepeat::Repeating {
-                            key: key,
+                          ResultingRepeat::Repeating { keys, delay_ms, interval_ms } => WorkingRepeat::Repeating {
+                            keys: keys,
                             next_wakeup: Instant::now() + Duration::from_millis(delay_ms as u64),
                             interval_ms: interval_ms
                           },
@@ -566,7 +573,7 @@ mod tests {
     let layout = Layout {
       mappings: vec![
         Mapping { from: vec![A], to: vec![A], repeat: Repeat::Disabled, ..Default::default() },
-        Mapping { from: vec![B], to: vec![B], repeat: Repeat::Special { key: C, delay_ms: 130, interval_ms: 30 }, ..Default::default() },
+        Mapping { from: vec![B], to: vec![B], repeat: Repeat::Special { keys: vec![C], delay_ms: 130, interval_ms: 30 }, ..Default::default() },
       ]
     };
     
@@ -617,7 +624,7 @@ mod tests {
     let layout = Layout {
       mappings: vec![
         Mapping { from: vec![A], to: vec![A], repeat: Repeat::Disabled, ..Default::default() },
-        Mapping { from: vec![B], to: vec![B], repeat: Repeat::Special { key: C, delay_ms: 130, interval_ms: 30 }, ..Default::default() },
+        Mapping { from: vec![B], to: vec![B], repeat: Repeat::Special { keys: vec![C], delay_ms: 130, interval_ms: 30 }, ..Default::default() },
       ]
     };
     
@@ -645,6 +652,53 @@ mod tests {
     
     ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(130)), result: PollResult::TimedOut });
     ops.push_back(TestOp::Send { evs: vec![Pressed(C), Released(C)] });
+    
+    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(160)), result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(D)) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(D)] });
+    ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
+    
+    ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::End });
+    
+    let mut driver = TestDriver { ops: ops };
+    do_remapping_loop_one_device(&mut driver, layout).unwrap();
+    driver.finish();
+  }
+  
+  #[test]
+  fn test_remapping_loop_repeat_3() {
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![A], to: vec![A], repeat: Repeat::Disabled, ..Default::default() },
+        Mapping { from: vec![B], to: vec![B], repeat: Repeat::Special { keys: vec![LEFTCTRL, C], delay_ms: 130, interval_ms: 30 }, ..Default::default() },
+      ]
+    };
+    
+    let mut ops: VecDeque<TestOp> = VecDeque::new();
+    ops.push_back(TestOp::RegisterPoll);
+    
+    ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(LEFTSHIFT)) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(LEFTSHIFT)] });
+    ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
+    
+    ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(A)) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(A), Released(A)] });
+    ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
+    
+    ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::One(Released(A)) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
+    
+    ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
+    ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(B)) });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(B), Released(B)] });
+    ops.push_back(TestOp::NextKeyboard { result: Next::Busy });
+    
+    ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(130)), result: PollResult::TimedOut });
+    ops.push_back(TestOp::Send { evs: vec![Pressed(LEFTCTRL), Pressed(C), Released(C), Released(LEFTCTRL)] });
     
     ops.push_back(TestOp::Poll { timeout: Some(Duration::from_millis(160)), result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Pressed(D)) });

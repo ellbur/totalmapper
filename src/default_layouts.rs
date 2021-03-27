@@ -184,17 +184,22 @@ fn _super_dvorak() -> Layout {
   
   let mut char_mappings = make_us_mappings(rows, &vec![CAPSLOCK, RIGHTALT, LEFTMETA], true, true);
   
+  // Safe keys to use: F19 F20 F21 F24
   let mut other_mappings = vec![
-    Mapping { from: vec![U], to: vec![G], repeat: Repeat::Special { key: F13, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![I], to: vec![C], repeat: Repeat::Special { key: F15, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![H], to: vec![D], repeat: Repeat::Special { key: F16, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![J], to: vec![H], repeat: Repeat::Special { key: F17, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![K], to: vec![T], repeat: Repeat::Special { key: F19, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![L], to: vec![N], repeat: Repeat::Special { key: F20, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![SEMICOLON], to: vec![S], repeat: Repeat::Special { key: F21, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![N], to: vec![B], repeat: Repeat::Special { key: F22, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![M], to: vec![M], repeat: Repeat::Special { key: F23, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
-    Mapping { from: vec![COMMA], to: vec![W], repeat: Repeat::Special { key: F24, delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![U],     to: vec![G], repeat: Repeat::Special { keys: vec![F19], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![M],     to: vec![M], repeat: Repeat::Special { keys: vec![LEFTCTRL, F19], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    
+    Mapping { from: vec![I],     to: vec![C], repeat: Repeat::Special { keys: vec![F20], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![K],     to: vec![T], repeat: Repeat::Special { keys: vec![LEFTCTRL, F20], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    
+    Mapping { from: vec![J],     to: vec![H], repeat: Repeat::Special { keys: vec![F21], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![L],     to: vec![N], repeat: Repeat::Special { keys: vec![LEFTCTRL, F21], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    
+    Mapping { from: vec![N],     to: vec![B], repeat: Repeat::Special { keys: vec![F24], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    Mapping { from: vec![COMMA], to: vec![W], repeat: Repeat::Special { keys: vec![LEFTCTRL, F24], delay_ms: 180, interval_ms: 30 }, ..Default::default() },
+    
+    Mapping { from: vec![H], to: vec![D], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![SEMICOLON], to: vec![S], repeat: Repeat::Disabled, ..Default::default() },
     
     Mapping { from: vec![LEFTSHIFT, U], to: vec![LEFTSHIFT, G], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },
     Mapping { from: vec![LEFTSHIFT, I], to: vec![LEFTSHIFT, C], repeat: Repeat::Disabled, absorbing: vec![LEFTSHIFT], ..Default::default() },

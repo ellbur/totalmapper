@@ -213,24 +213,24 @@ fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_do
                   if alt_gr_down {
                     for sk in shift_keys {
                       for ak in alt_gr_keys {
-                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone(), repeat: repeat, absorbing: shift_absorbing(*sk), ..Default::default() });
+                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone(), repeat: repeat.clone(), absorbing: shift_absorbing(*sk), ..Default::default() });
                       }
                     }
                   }
                   else {
                     for sk in shift_keys {
-                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone(), repeat: repeat, absorbing: shift_absorbing(*sk), ..Default::default() });
+                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone(), repeat: repeat.clone(), absorbing: shift_absorbing(*sk), ..Default::default() });
                     }
                   }
                 }
                 else {
                   if alt_gr_down {
                     for ak in alt_gr_keys {
-                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone(), repeat: repeat, ..Default::default() });
+                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone(), repeat: repeat.clone(), ..Default::default() });
                     }
                   }
                   else {
-                    res.push(Mapping { from: vec![*k], to: keys.clone(), repeat: repeat, ..Default::default() });
+                    res.push(Mapping { from: vec![*k], to: keys.clone(), repeat: repeat.clone(), ..Default::default() });
                   }
                 }
               }

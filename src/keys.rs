@@ -35,12 +35,12 @@ impl Default for Mapping {
   }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Repeat {
   Normal,
   Disabled,
   Special {
-    key: KeyCode,
+    keys: Vec<KeyCode>,
     delay_ms: i32,
     interval_ms: i32
   }
