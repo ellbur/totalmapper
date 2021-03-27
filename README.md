@@ -12,6 +12,7 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 * Write layouts in a simple JSON syntax that is easy to generate programmatically
 * Run it on any Linux platform, including Chrome OS (in developer mode)
 * Run it on X and Wayland and with all window managers and GUI frameworks
+* Use a consistent layout across remote desktops and virtual machines
 * Change repeat behavior per-key (e.g., disable repeat or repeat with a different code than the initial press)
 * Prevent TYping LIke THis by making Shift only apply to one key
 
@@ -20,11 +21,11 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 ## Packages
 
 * Ubuntu amd64:
-    * [`totalmapper_1.3.2-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.2-focal_amd64.deb)
-    * [`totalmapper_1.3.2-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.2-groovy_amd64.deb)
+    * [`totalmapper_1.3.3-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.3-focal_amd64.deb)
+    * [`totalmapper_1.3.3-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper_1.3.3-groovy_amd64.deb)
 * Self-contained Linux binaries (useful for Chrome OS):
-    * [`totalmapper-static-linux-amd64-1.3.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-amd64-1.3.2.tar.gz)
-    * [`totalmapper-static-linux-aarch64-1.3.2.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-aarch64-1.3.2.tar.gz)
+    * [`totalmapper-static-linux-amd64-1.3.3.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-amd64-1.3.3.tar.gz)
+    * [`totalmapper-static-linux-aarch64-1.3.3.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.2/totalmapper-static-linux-aarch64-1.3.3.tar.gz)
 
 ## From source
 
@@ -54,6 +55,8 @@ Define your own layout (see below) and remap your keyboard with:
     totalmapper remap --layout-file my-layout.json --all-keyboards
 
 # Running automatically
+
+If your system uses `systemd`, you can add a `udev` rule that will automatically run `totalmapper` whenever a new keyboard is plugged in:
 
     sudo totalmapper add_systemd_service --default-layout caps-for-movement
 
@@ -113,7 +116,7 @@ You can make a key repeat with a different code than the initial press:
 { "from": [ "SEMICOLON" ], "to": [ "S" ], "repeat": { "Special": { "keys": ["F21"], "delay_ms": 180, "interval_ms": 30 } } }
 ```
 
-This will case the first press of the <kbd>;</kbd> key to generate the code for <kbd>S</kbd>, but, if held down, the repeat code will be <kbd>F21</kbd>. This can be used to make a key that repeats in some apps but not others by configuring how those apps treat the repeat code. I personally use it to make Vim movement letters (h, j, k, l) only repeat in Vim normal mode.  
+This will cause the first press of the <kbd>;</kbd> key to generate the code for <kbd>S</kbd>, but, if held down, the repeat code will be <kbd>F21</kbd>. This can be used to make a key that repeats in some apps but not others by configuring how those apps treat the repeat code. I personally use it to make Vim movement letters (h, j, k, l) only repeat in Vim normal mode.  
 
 ## Preventing extra Shift
 
@@ -139,4 +142,4 @@ On some devices, the remapped keyboard will not automatically disable in tablet 
 
     totalmapper remap --dev-file /dev/input/event2 --tablet-mode-switch-device /dev/input/event5 --default-layout caps-for-movement
 
-You can test devices under `/dev/input` with `evtest` to find your tablet mode switch.
+You can inspect devices under `/dev/input` with `evtest` to find your tablet mode switch.
