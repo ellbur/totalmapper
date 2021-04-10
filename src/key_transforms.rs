@@ -404,6 +404,8 @@ fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
   to_remove.append(&mut state.mapped_absorbed_keys);
   state.absorbing_trigger = None;
   
+  println!("release_absorbed_keys(): {:?}", to_remove);
+  
   for k in to_remove {
     {
       let mut i: isize = state.active_mappings.len() as isize - 1;
@@ -430,6 +432,8 @@ fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
 }
 
 fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
+  println!("== {:?} ==", k);
+  
   let mappings = &mapper.layout.mappings;
   let mut state = &mut mapper.state;
   
@@ -441,8 +445,26 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   state.repeating_trigger = None;
   
   for mappings in mappings.get(&k) {
+    let should_absorb = {
+      match &state.absorbing_trigger {
+        Some(absorbing_trigger) => *absorbing_trigger != k,
+        None => true
+      }
+    };
+    
+    let absorbed_keys = {
+      if should_absorb {
+        state.mapped_absorbed_keys.clone()
+      }
+      else {
+        vec![]
+      }
+    };
+    
     for mapping in mappings {
-      if is_supported(&mapping.from, &state.input_pressed_keys, &state.mapped_absorbed_keys, &k) {
+      println!("Checking {:?}", mapping);
+      if is_supported(&mapping.from, &state.input_pressed_keys, &absorbed_keys, &k) {
+        println!(" Supported");
         res.append(add_new_mapping(&mut state, &k, &mapping));
         any_hit = true;
         break;
@@ -476,6 +498,8 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   }
   
   state.input_pressed_keys.push(k);
+  
+  println!("");
   
   res
 }
@@ -534,6 +558,8 @@ fn remove_mapping(state: &mut State, i: usize, removed_key: KeyCode) -> Vec<Even
 }
 
 fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
+  println!("== /{:?} ==", k);
+  
   let state = &mut mapper.state;
   
   let mut events: Vec<Event> = Vec::new();
@@ -570,6 +596,8 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     },
     None => ResultingRepeat::Disabled
   };
+  
+  println!("");
   
   StepResult { events, repeat }
 }
@@ -772,6 +800,23 @@ mod tests {
     assert_eq!(vec![Pressed(A)], mapper.step(Pressed(A)).events);
     assert_eq!(vec![Released(A)], mapper.step(Released(A)).events);
     assert_eq!(vec![Released(LEFTSHIFT), Pressed(B)], mapper.step(Pressed(B)).events);
+  }
+  
+  #[test]
+  fn absorbing_double_press_test_2() {
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![Z], to: vec![APOSTROPHE], ..Default::default() },
+        Mapping { from: vec![RIGHTSHIFT, Z], to: vec![LEFTSHIFT, APOSTROPHE], absorbing: vec![RIGHTSHIFT], ..Default::default() },
+      ]
+    };
+    
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    assert_eq!(vec![Pressed(RIGHTSHIFT)], mapper.step(Pressed(RIGHTSHIFT)).events);
+    assert_eq!(vec![Released(RIGHTSHIFT), Pressed(LEFTSHIFT), Pressed(APOSTROPHE)], mapper.step(Pressed(Z)).events);
+    assert_eq!(vec![Released(APOSTROPHE), Released(LEFTSHIFT)], mapper.step(Released(Z)).events);
+    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(APOSTROPHE)], mapper.step(Pressed(Z)).events);
   }
 }
 
