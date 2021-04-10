@@ -38,110 +38,131 @@ pub struct USKeyboardLayout {
 }
 
 lazy_static! {
-  static ref CHAR_ACCESS_MAP: HashMap<char, Vec<KeyCode>> = _char_access_map();
+  static ref CHAR_ACCESS_MAP: HashMap<char, SinkKey> = _char_access_map();
 }
 
-fn _char_access_map() -> HashMap<char, Vec<KeyCode>> {
+struct SinkKey {
+  sh: bool,
+  k: KeyCode
+}
+
+fn adapt(sink_key: &SinkKey, shift_key: &KeyCode) -> Vec<KeyCode> {
+  if !sink_key.sh {
+    vec![sink_key.k]
+  }
+  else if *shift_key == LEFTSHIFT {
+    vec![LEFTSHIFT, sink_key.k]
+  }
+  else if *shift_key == RIGHTSHIFT {
+    vec![RIGHTSHIFT, sink_key.k]
+  }
+  else {
+    vec![LEFTSHIFT, sink_key.k]
+  }
+}
+
+fn _char_access_map() -> HashMap<char, SinkKey> {
   let mut res = HashMap::new();
   
-  res.insert('0', vec![K0]);
-  res.insert('1', vec![K1]);
-  res.insert('2', vec![K2]);
-  res.insert('3', vec![K3]);
-  res.insert('4', vec![K4]);
-  res.insert('5', vec![K5]);
-  res.insert('6', vec![K6]);
-  res.insert('7', vec![K7]);
-  res.insert('8', vec![K8]);
-  res.insert('9', vec![K9]);
+  res.insert('0', SinkKey { sh: false, k: K0 });
+  res.insert('1', SinkKey { sh: false, k: K1 });
+  res.insert('2', SinkKey { sh: false, k: K2 });
+  res.insert('3', SinkKey { sh: false, k: K3 });
+  res.insert('4', SinkKey { sh: false, k: K4 });
+  res.insert('5', SinkKey { sh: false, k: K5 });
+  res.insert('6', SinkKey { sh: false, k: K6 });
+  res.insert('7', SinkKey { sh: false, k: K7 });
+  res.insert('8', SinkKey { sh: false, k: K8 });
+  res.insert('9', SinkKey { sh: false, k: K9 });
   
-  res.insert('a', vec![A]);
-  res.insert('b', vec![B]);
-  res.insert('c', vec![C]);
-  res.insert('d', vec![D]);
-  res.insert('e', vec![E]);
-  res.insert('f', vec![F]);
-  res.insert('g', vec![G]);
-  res.insert('h', vec![H]);
-  res.insert('i', vec![I]);
-  res.insert('j', vec![J]);
-  res.insert('k', vec![K]);
-  res.insert('l', vec![L]);
-  res.insert('m', vec![M]);
-  res.insert('n', vec![N]);
-  res.insert('o', vec![O]);
-  res.insert('p', vec![P]);
-  res.insert('q', vec![Q]);
-  res.insert('r', vec![R]);
-  res.insert('s', vec![S]);
-  res.insert('t', vec![T]);
-  res.insert('u', vec![U]);
-  res.insert('v', vec![V]);
-  res.insert('w', vec![W]);
-  res.insert('x', vec![X]);
-  res.insert('y', vec![Y]);
-  res.insert('z', vec![Z]);
+  res.insert('a', SinkKey { sh: false, k: A });
+  res.insert('b', SinkKey { sh: false, k: B });
+  res.insert('c', SinkKey { sh: false, k: C });
+  res.insert('d', SinkKey { sh: false, k: D });
+  res.insert('e', SinkKey { sh: false, k: E });
+  res.insert('f', SinkKey { sh: false, k: F });
+  res.insert('g', SinkKey { sh: false, k: G });
+  res.insert('h', SinkKey { sh: false, k: H });
+  res.insert('i', SinkKey { sh: false, k: I });
+  res.insert('j', SinkKey { sh: false, k: J });
+  res.insert('k', SinkKey { sh: false, k: K });
+  res.insert('l', SinkKey { sh: false, k: L });
+  res.insert('m', SinkKey { sh: false, k: M });
+  res.insert('n', SinkKey { sh: false, k: N });
+  res.insert('o', SinkKey { sh: false, k: O });
+  res.insert('p', SinkKey { sh: false, k: P });
+  res.insert('q', SinkKey { sh: false, k: Q });
+  res.insert('r', SinkKey { sh: false, k: R });
+  res.insert('s', SinkKey { sh: false, k: S });
+  res.insert('t', SinkKey { sh: false, k: T });
+  res.insert('u', SinkKey { sh: false, k: U });
+  res.insert('v', SinkKey { sh: false, k: V });
+  res.insert('w', SinkKey { sh: false, k: W });
+  res.insert('x', SinkKey { sh: false, k: X });
+  res.insert('y', SinkKey { sh: false, k: Y });
+  res.insert('z', SinkKey { sh: false, k: Z });
   
-  res.insert('A', vec![LEFTSHIFT, A]);
-  res.insert('B', vec![LEFTSHIFT, B]);
-  res.insert('C', vec![LEFTSHIFT, C]);
-  res.insert('D', vec![LEFTSHIFT, D]);
-  res.insert('E', vec![LEFTSHIFT, E]);
-  res.insert('F', vec![LEFTSHIFT, F]);
-  res.insert('G', vec![LEFTSHIFT, G]);
-  res.insert('H', vec![LEFTSHIFT, H]);
-  res.insert('I', vec![LEFTSHIFT, I]);
-  res.insert('J', vec![LEFTSHIFT, J]);
-  res.insert('K', vec![LEFTSHIFT, K]);
-  res.insert('L', vec![LEFTSHIFT, L]);
-  res.insert('M', vec![LEFTSHIFT, M]);
-  res.insert('N', vec![LEFTSHIFT, N]);
-  res.insert('O', vec![LEFTSHIFT, O]);
-  res.insert('P', vec![LEFTSHIFT, P]);
-  res.insert('Q', vec![LEFTSHIFT, Q]);
-  res.insert('R', vec![LEFTSHIFT, R]);
-  res.insert('S', vec![LEFTSHIFT, S]);
-  res.insert('T', vec![LEFTSHIFT, T]);
-  res.insert('U', vec![LEFTSHIFT, U]);
-  res.insert('V', vec![LEFTSHIFT, V]);
-  res.insert('W', vec![LEFTSHIFT, W]);
-  res.insert('X', vec![LEFTSHIFT, X]);
-  res.insert('Y', vec![LEFTSHIFT, Y]);
-  res.insert('Z', vec![LEFTSHIFT, Z]);
+  res.insert('A', SinkKey { sh: true, k: A });
+  res.insert('B', SinkKey { sh: true, k: B });
+  res.insert('C', SinkKey { sh: true, k: C });
+  res.insert('D', SinkKey { sh: true, k: D });
+  res.insert('E', SinkKey { sh: true, k: E });
+  res.insert('F', SinkKey { sh: true, k: F });
+  res.insert('G', SinkKey { sh: true, k: G });
+  res.insert('H', SinkKey { sh: true, k: H });
+  res.insert('I', SinkKey { sh: true, k: I });
+  res.insert('J', SinkKey { sh: true, k: J });
+  res.insert('K', SinkKey { sh: true, k: K });
+  res.insert('L', SinkKey { sh: true, k: L });
+  res.insert('M', SinkKey { sh: true, k: M });
+  res.insert('N', SinkKey { sh: true, k: N });
+  res.insert('O', SinkKey { sh: true, k: O });
+  res.insert('P', SinkKey { sh: true, k: P });
+  res.insert('Q', SinkKey { sh: true, k: Q });
+  res.insert('R', SinkKey { sh: true, k: R });
+  res.insert('S', SinkKey { sh: true, k: S });
+  res.insert('T', SinkKey { sh: true, k: T });
+  res.insert('U', SinkKey { sh: true, k: U });
+  res.insert('V', SinkKey { sh: true, k: V });
+  res.insert('W', SinkKey { sh: true, k: W });
+  res.insert('X', SinkKey { sh: true, k: X });
+  res.insert('Y', SinkKey { sh: true, k: Y });
+  res.insert('Z', SinkKey { sh: true, k: Z });
   
-  res.insert('!', vec![LEFTSHIFT, K1]);
-  res.insert('@', vec![LEFTSHIFT, K2]);
-  res.insert('#', vec![LEFTSHIFT, K3]);
-  res.insert('$', vec![LEFTSHIFT, K4]);
-  res.insert('%', vec![LEFTSHIFT, K5]);
-  res.insert('^', vec![LEFTSHIFT, K6]);
-  res.insert('&', vec![LEFTSHIFT, K7]);
-  res.insert('*', vec![LEFTSHIFT, K8]);
-  res.insert('(', vec![LEFTSHIFT, K9]);
-  res.insert(')', vec![LEFTSHIFT, K0]);
+  res.insert('!', SinkKey { sh: true, k: K1 });
+  res.insert('@', SinkKey { sh: true, k: K2 });
+  res.insert('#', SinkKey { sh: true, k: K3 });
+  res.insert('$', SinkKey { sh: true, k: K4 });
+  res.insert('%', SinkKey { sh: true, k: K5 });
+  res.insert('^', SinkKey { sh: true, k: K6 });
+  res.insert('&', SinkKey { sh: true, k: K7 });
+  res.insert('*', SinkKey { sh: true, k: K8 });
+  res.insert('(', SinkKey { sh: true, k: K9 });
+  res.insert(')', SinkKey { sh: true, k: K0 });
   
-  res.insert('~',  vec![LEFTSHIFT, GRAVE]);
-  res.insert('`',  vec![GRAVE]);
-  res.insert('-',  vec![MINUS]);
-  res.insert('_',  vec![LEFTSHIFT, MINUS]);
-  res.insert('=',  vec![EQUAL]);
-  res.insert('+',  vec![LEFTSHIFT, EQUAL]);
-  res.insert('[',  vec![LEFTBRACE]);
-  res.insert(']',  vec![RIGHTBRACE]);
-  res.insert('{',  vec![LEFTSHIFT, LEFTBRACE]);
-  res.insert('}',  vec![RIGHTSHIFT, RIGHTBRACE]);
-  res.insert(';',  vec![SEMICOLON]);
-  res.insert(':',  vec![LEFTSHIFT, SEMICOLON]);
-  res.insert('\'', vec![APOSTROPHE]);
-  res.insert('"',  vec![LEFTSHIFT, APOSTROPHE]);
-  res.insert(',',  vec![COMMA]);
-  res.insert('.',  vec![DOT]);
-  res.insert('<',  vec![LEFTSHIFT, COMMA]);
-  res.insert('>',  vec![LEFTSHIFT, DOT]);
-  res.insert('/',  vec![SLASH]);
-  res.insert('?',  vec![LEFTSHIFT, SLASH]);
-  res.insert('\\', vec![BACKSLASH]);
-  res.insert('|',  vec![LEFTSHIFT, BACKSLASH]);
+  res.insert(',',  SinkKey { sh: false, k: COMMA });
+  res.insert('.',  SinkKey { sh: false, k: DOT });
+  res.insert('`',  SinkKey { sh: false, k: GRAVE });
+  res.insert('-',  SinkKey { sh: false, k: MINUS });
+  res.insert('=',  SinkKey { sh: false, k: EQUAL });
+  res.insert('[',  SinkKey { sh: false, k: LEFTBRACE });
+  res.insert(']',  SinkKey { sh: false, k: RIGHTBRACE });
+  res.insert(';',  SinkKey { sh: false, k: SEMICOLON });
+  res.insert('\'', SinkKey { sh: false, k: APOSTROPHE });
+  res.insert('/',  SinkKey { sh: false, k: SLASH });
+  res.insert('\\', SinkKey { sh: false, k: BACKSLASH });
+  
+  res.insert('~',  SinkKey { sh: true, k: GRAVE });
+  res.insert('_',  SinkKey { sh: true, k: MINUS });
+  res.insert('+',  SinkKey { sh: true, k: EQUAL });
+  res.insert('{',  SinkKey { sh: true, k: LEFTBRACE });
+  res.insert('}',  SinkKey { sh: true, k: RIGHTBRACE });
+  res.insert(':',  SinkKey { sh: true, k: SEMICOLON });
+  res.insert('"',  SinkKey { sh: true, k: APOSTROPHE });
+  res.insert('<',  SinkKey { sh: true, k: COMMA });
+  res.insert('>',  SinkKey { sh: true, k: DOT });
+  res.insert('?',  SinkKey { sh: true, k: SLASH });
+  res.insert('|',  SinkKey { sh: true, k: BACKSLASH });
   
   res
 }
@@ -208,29 +229,29 @@ fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_do
           if ch != ' ' {
             match CHAR_ACCESS_MAP.get(&ch) {
               None => panic!("Don't know how to type char {:?}", ch),
-              Some(keys) => {
+              Some(sink_key) => {
                 if shift_down {
                   if alt_gr_down {
                     for sk in shift_keys {
                       for ak in alt_gr_keys {
-                        res.push(Mapping { from: vec![*sk, *ak, *k], to: keys.clone(), repeat: repeat.clone(), absorbing: shift_absorbing(*sk), ..Default::default() });
+                        res.push(Mapping { from: vec![*sk, *ak, *k], to: adapt(sink_key, sk), repeat: repeat.clone(), absorbing: shift_absorbing(*sk), ..Default::default() });
                       }
                     }
                   }
                   else {
                     for sk in shift_keys {
-                      res.push(Mapping { from: vec![*sk, *k], to: keys.clone(), repeat: repeat.clone(), absorbing: shift_absorbing(*sk), ..Default::default() });
+                      res.push(Mapping { from: vec![*sk, *k], to: adapt(sink_key, sk), repeat: repeat.clone(), absorbing: shift_absorbing(*sk), ..Default::default() });
                     }
                   }
                 }
                 else {
                   if alt_gr_down {
                     for ak in alt_gr_keys {
-                      res.push(Mapping { from: vec![*ak, *k], to: keys.clone(), repeat: repeat.clone(), ..Default::default() });
+                      res.push(Mapping { from: vec![*ak, *k], to: vec![sink_key.k], repeat: repeat.clone(), ..Default::default() });
                     }
                   }
                   else {
-                    res.push(Mapping { from: vec![*k], to: keys.clone(), repeat: repeat.clone(), ..Default::default() });
+                    res.push(Mapping { from: vec![*k], to: vec![sink_key.k], repeat: repeat.clone(), ..Default::default() });
                   }
                 }
               }
