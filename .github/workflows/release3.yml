@@ -28,6 +28,8 @@ jobs:
         run: ./release-scripts/build-focal
       - name: Build Groovy
         run: ./release-scripts/build-groovy
+      - name: Build Hirsute
+        run: ./release-scripts/build-hirsute
       - name: Make release
         uses: softprops/action-gh-release@v0.1.5
         with:
