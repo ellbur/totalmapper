@@ -7,7 +7,7 @@ use nix::unistd::{read, write};
 use nix::Error;
 use libc::{input_event};
 use std::mem::size_of;
-use uinput_sys::{ui_set_evbit, EV_SYN, EV_KEY, EV_MSC, ui_dev_create, ui_set_keybit, KEY_MAX};
+use uinput_sys::{ui_set_evbit, EV_SYN, EV_KEY, EV_MSC, ui_dev_create, ui_set_keybit};
 use crate::struct_ser::StructSerializer;
 use std::os::unix::io::RawFd;
 use nix::ioctl_write_int;
@@ -77,7 +77,7 @@ impl DevInputWriter {
       ui_set_evbit(fdo, EV_MSC);
     }
     
-    for i in 0 .. KEY_MAX {
+    for i in 1 .. 562 {
       unsafe { ui_set_keybit(fdo, i); }
     }
     
@@ -105,9 +105,7 @@ impl DevInputWriter {
     
     unsafe { ui_dev_create(fdo); }
   
-    Ok(DevInputWriter {
-      fd: fdo
-    })
+    Ok(DevInputWriter { fd: fdo })
   }
   
   pub fn send(self: &mut DevInputWriter, evs: &Vec<Event>) -> Result<(), Error> {
