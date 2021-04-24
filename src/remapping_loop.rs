@@ -333,7 +333,7 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                       if !in_tablet_mode {
                         let step_out = mapper.step(ev_in);
                         let evs_out = step_out.events;
-
+                        
                         if !evs_out.is_empty() {
                           driver.send(&evs_out)?;
                         }
