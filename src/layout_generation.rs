@@ -247,11 +247,11 @@ fn string_mappings(hardware_keys: &Vec<KeyCode>, desired_chars: String, shift_do
                 else {
                   if alt_gr_down {
                     for ak in alt_gr_keys {
-                      res.push(Mapping { from: vec![*ak, *k], to: vec![sink_key.k], repeat: repeat.clone(), ..Default::default() });
+                      res.push(Mapping { from: vec![*ak, *k], to: adapt(sink_key, &LEFTSHIFT), repeat: repeat.clone(), ..Default::default() });
                     }
                   }
                   else {
-                    res.push(Mapping { from: vec![*k], to: vec![sink_key.k], repeat: repeat.clone(), ..Default::default() });
+                    res.push(Mapping { from: vec![*k], to: adapt(sink_key, &LEFTSHIFT), repeat: repeat.clone(), ..Default::default() });
                   }
                 }
               }
