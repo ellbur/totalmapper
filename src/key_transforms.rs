@@ -404,8 +404,6 @@ fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
   to_remove.append(&mut state.mapped_absorbed_keys);
   state.absorbing_trigger = None;
   
-  println!("release_absorbed_keys(): {:?}", to_remove);
-  
   for k in to_remove {
     {
       let mut i: isize = state.active_mappings.len() as isize - 1;
@@ -432,8 +430,6 @@ fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
 }
 
 fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
-  println!("== {:?} ==", k);
-  
   let mappings = &mapper.layout.mappings;
   let mut state = &mut mapper.state;
   
@@ -462,9 +458,7 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     };
     
     for mapping in mappings {
-      println!("Checking {:?}", mapping);
       if is_supported(&mapping.from, &state.input_pressed_keys, &absorbed_keys, &k) {
-        println!(" Supported");
         res.append(add_new_mapping(&mut state, &k, &mapping));
         any_hit = true;
         break;
@@ -498,8 +492,6 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   }
   
   state.input_pressed_keys.push(k);
-  
-  println!("");
   
   res
 }
@@ -558,8 +550,6 @@ fn remove_mapping(state: &mut State, i: usize, removed_key: KeyCode) -> Vec<Even
 }
 
 fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
-  println!("== /{:?} ==", k);
-  
   let state = &mut mapper.state;
   
   let mut events: Vec<Event> = Vec::new();
@@ -596,8 +586,6 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     },
     None => ResultingRepeat::Disabled
   };
-  
-  println!("");
   
   StepResult { events, repeat }
 }
