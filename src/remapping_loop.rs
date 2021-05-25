@@ -74,20 +74,14 @@ pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, 
       }
     }?;
     
-    rws.push(RW {
-      r: r,
-      w: w,
-      t: t
-    });
+    rws.push(RW { r, w, t });
   }
   
   let mut threads: Vec<JoinHandle<Result<(), String>>> = Vec::new();
   for rw in rws.drain(..) {
     let local_layout = layout.clone();
     threads.push(spawn(move || {
-      let mut driver = RealDriver {
-        rw: rw
-      };
+      let mut driver = RealDriver { rw };
       do_remapping_loop_one_device(&mut driver, local_layout)
     }));
   }
@@ -178,10 +172,7 @@ impl Driver for RealDriver {
     
     let events = Events::with_capacity(24);
     
-    Ok(RealPollRegistry {
-      poll: poll,
-      events: events
-    })
+    Ok(RealPollRegistry { poll, events })
   }
   
   fn poll(&mut self, registry: &mut RealPollRegistry, timeout: Option<Duration>) -> Result<PollResult, String>  {
@@ -299,9 +290,9 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                 }
                 driver.send(&repeat_send)?;
                 working_repeat = WorkingRepeat::Repeating {
-                  keys: keys,
+                  keys,
                   next_wakeup: next_wakeup + Duration::from_millis(interval_ms as u64),
-                  interval_ms: interval_ms
+                  interval_ms
                 };
               }
               else {
@@ -340,9 +331,9 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                         
                         working_repeat = match step_out.repeat {
                           ResultingRepeat::Repeating { keys, delay_ms, interval_ms } => WorkingRepeat::Repeating {
-                            keys: keys,
+                            keys,
                             next_wakeup: Instant::now() + Duration::from_millis(delay_ms as u64),
-                            interval_ms: interval_ms
+                            interval_ms
                           },
                           ResultingRepeat::Disabled => WorkingRepeat::Idle,
                           ResultingRepeat::NoChange => working_repeat
