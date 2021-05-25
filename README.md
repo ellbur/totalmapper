@@ -21,11 +21,12 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 ## Packages
 
 * Ubuntu amd64:
-    * [`totalmapper_1.3.4-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.4/totalmapper_1.3.4-focal_amd64.deb)
-    * [`totalmapper_1.3.4-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.4/totalmapper_1.3.4-groovy_amd64.deb)
+    * [`totalmapper_1.3.6-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper_1.3.6-focal_amd64.deb)
+    * [`totalmapper_1.3.6-groovy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper_1.3.6-groovy_amd64.deb)
+    * [`totalmapper_1.3.6-hirsute_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper_1.3.6-hirsute_amd64.deb)
 * Self-contained Linux binaries (useful for Chrome OS):
-    * [`totalmapper-static-linux-amd64-1.3.4.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.4/totalmapper-static-linux-amd64-1.3.4.tar.gz)
-    * [`totalmapper-static-linux-aarch64-1.3.4.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.4/totalmapper-static-linux-aarch64-1.3.4.tar.gz)
+    * [`totalmapper-static-linux-amd64-1.3.6.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper-static-linux-amd64-1.3.6.tar.gz)
+    * [`totalmapper-static-linux-aarch64-1.3.6.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper-static-linux-aarch64-1.3.6.tar.gz)
 
 ## From source
 
@@ -40,7 +41,9 @@ With [`cargo`](https://doc.rust-lang.org/cargo/):
 
 Try one of the builtin layouts with:
 
-    totalmapper remap --default-layout caps-for-movement --all-keyboards
+    sleep 1 ; totalmapper remap --default-layout caps-for-movement --all-keyboards
+
+(`sleep` gives you time to release the enter key when running the command.)
 
 See the list of builtin layouts with:
 
