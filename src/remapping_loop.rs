@@ -6,7 +6,7 @@ use nix::Error;
 use nix::errno::Errno::ENODEV;
 use crate::key_transforms;
 use crate::keyboard_listing::{filter_keyboards, list_keyboards};
-use crate::dev_input_rw::{DevInputReader, DevInputWriter};
+use crate::dev_input_rw::{DevInputReader, DevInputWriter, Exclusion};
 use std::thread::{spawn, JoinHandle};
 use std::path::{Path, PathBuf};
 use nix::errno::Errno::EAGAIN;
@@ -56,7 +56,7 @@ pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, 
   let mut rws: Vec<RW> = Vec::new();
   
   for p in devices {
-    let r = match DevInputReader::open(p.as_path(), true, true) {
+    let r = match DevInputReader::open(p.as_path(), Exclusion::WaitReleaseAndExclude, true) {
       Err(e) => Err(format!("Failed to open {:?} for reading: {}", p, e)),
       Ok(r) => Ok(r)
     }?;
