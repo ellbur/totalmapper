@@ -7,6 +7,7 @@ use num_derive::FromPrimitive;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, FromStr, Serialize, Deserialize, FromPrimitive)]
 #[allow(non_camel_case_types)]
+#[repr(i32)]
 pub enum KeyCode {
   ESC = 1,
   #[serde(rename = "1")]

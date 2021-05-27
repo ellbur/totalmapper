@@ -27,7 +27,7 @@ pub fn do_remapping_loop_all_devices(layout: &Layout) -> Result<(), String> {
   match list_keyboards() {
     Err(e) => Err(format!("Failed to get the list of keyboards: {}", e)),
     Ok(devs) => {
-      do_remapping_loop_these_devices(&devs, layout, &None)
+      do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None)
     }
   }
 }
