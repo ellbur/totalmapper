@@ -113,6 +113,33 @@ A basic mapping maps some combination of keys to another combination of keys:
 
 The above mapping will be triggered when the user presses the left control key and then taps the 'C' key, and will make it as if the left alt were pressed while tapping '1'.
 
+## Non-English symbols
+
+`totalmapper` works with keycodes, not key symbols. There are many more symbols than keycodes. For example, `a` and `A` are separate symbols, but in keycodes, `A` is just <kbd>Shift</kbd> + <kbd>A</kbd>. 
+
+Typically on Linux, the mapping between keycodes and symbols is defined through a system like [XKB](https://wiki.archlinux.org/title/X_keyboard_extension). You can use XKB and `totalmapper` together: `totalmapper` will remap keycodes, and XKB will apply the appropriate symbols to the resulting keycodes.
+
+If your keyboard has non-English symbols on it (such as ñ, ü, ㄴㄷㄹㅁ, or д), `totalmapper` will remap those keys the same as any other keys.
+
+To figure out what keycodes correspond to your physical keys, you can inspect your keyboard device with `evtest`. Here is an example output from `evtest /dev/input/event2`:
+
+    Event: time 1623709383.272708, type 4 (EV_MSC), code 4 (MSC_SCAN), value 40
+    Event: time 1623709383.272708, type 1 (EV_KEY), code 64 (KEY_F6), value 0
+    Event: time 1623709383.272708, -------------- SYN_REPORT ------------
+    Event: time 1623709403.107286, type 4 (EV_MSC), code 4 (MSC_SCAN), value 1e
+    Event: time 1623709403.107286, type 1 (EV_KEY), code 30 (KEY_A), value 1
+    Event: time 1623709403.107286, -------------- SYN_REPORT ------------
+    Event: time 1623709403.240861, type 4 (EV_MSC), code 4 (MSC_SCAN), value 1e
+    Event: time 1623709403.240861, type 1 (EV_KEY), code 30 (KEY_A), value 0
+    Event: time 1623709403.240861, -------------- SYN_REPORT ------------
+    Event: time 1623709405.606143, type 4 (EV_MSC), code 4 (MSC_SCAN), value 1f
+    Event: time 1623709405.606143, type 1 (EV_KEY), code 31 (KEY_S), value 1
+    Event: time 1623709405.606143, -------------- SYN_REPORT ------------
+    Event: time 1623709405.722982, type 4 (EV_MSC), code 4 (MSC_SCAN), value 1f
+    Event: time 1623709405.722982, type 1 (EV_KEY), code 31 (KEY_S), value 0
+
+The `KEY_` part tells you what keycode was typed. Remove the `KEY_` prefix and you can use it as a key in `totalmapper`.
+
 ## Custom repeat
 
 ### Disabling repeat
