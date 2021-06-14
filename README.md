@@ -91,6 +91,18 @@ You can use any key as a modifier. You don't have to tell totalmapper which keys
 
 Be careful that if you want to use a key as a modifier that normally has another function, you will want to map the key by itself to `[]`, as in the example above.
 
+## Remapping non-QWERTY layouts
+
+The key names used to define JSON mappings correspond to kernel constants that assume a physical QWERTY layout and map directly to raw keycodes.
+
+Because of this, JSON mappings *must* be defined using labels that correspond to a QWERTY layout regardless of which layout you have configured (e.g. Coleman, Dvorak).
+
+For example, the following mapping would trigger when pressing the key that maps to the character `H` in a Dvorak layout ([keycode 36](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h#L111)) because it maps to the character `J` in a QWERTY layout:
+
+```json
+{ "from": [ "J" ], "to": [ "DOWN" ] }
+```
+
 ## Remapping
 
 A basic mapping maps some combination of keys to another combination of keys:
