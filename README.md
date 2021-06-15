@@ -63,6 +63,9 @@ If your system uses `systemd`, you can add a `udev` rule that will automatically
 
     sudo totalmapper add_systemd_service --default-layout caps-for-movement
 
+This will install a service definition in `/etc/systemd/system/totalmapper@.service` that will run `totalmapper` under the user `nobody` in the `input` group.
+If `nobody` is not a member of the `input` group, run `sudo groupmems --add nobody --group input` to add it so proper access can be granted.
+
 # Defining layouts
 
 Layouts are defined with a simple JSON syntax:
