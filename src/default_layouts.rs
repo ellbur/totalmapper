@@ -261,9 +261,9 @@ fn _super_dvorak() -> Layout {
     Mapping { from: vec![RIGHTALT], to: vec![], ..Default::default() },
     Mapping { from: vec![LEFTMETA], to: vec![], ..Default::default() },
     
-    Mapping { from: vec![LEFTMETA, Q], to: vec![ESC], ..Default::default() },
-    Mapping { from: vec![RIGHTALT, Q], to: vec![ESC], ..Default::default() },
-    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC], ..Default::default() },
+    Mapping { from: vec![LEFTMETA, Q], to: vec![ESC], absorbing: vec![LEFTMETA], ..Default::default() },
+    Mapping { from: vec![RIGHTALT, Q], to: vec![ESC], absorbing: vec![RIGHTALT], ..Default::default() },
+    Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC], absorbing: vec![CAPSLOCK], ..Default::default() },
     
     Mapping { from: vec![BACKSLASH], to: vec![TAB], ..Default::default() },
     Mapping { from: vec![GRAVE], to: vec![LEFTMETA], ..Default::default() },
