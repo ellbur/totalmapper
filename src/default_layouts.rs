@@ -167,7 +167,7 @@ fn _super_dvorak() -> Layout {
     row_1_shift_alt_gr: "".to_string(),
     
     row_q: ";,.pyf  rl~@".to_string(),
-    row_q_shift: ":<>     RL?^".to_string(),
+    row_q_shift: ":<>PYF  RL?^".to_string(),
     row_q_alt_gr: " {}% \\*][|".to_string(),
     row_q_shift_alt_gr: "".to_string(),
     
