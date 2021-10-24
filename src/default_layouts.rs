@@ -266,6 +266,8 @@ fn _super_dvorak() -> Layout {
     Mapping { from: vec![CAPSLOCK, Q], to: vec![ESC], absorbing: vec![CAPSLOCK], ..Default::default() },
     
     Mapping { from: vec![BACKSLASH], to: vec![TAB], ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, BACKSLASH], to: vec![LEFTSHIFT, TAB], ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, BACKSLASH], to: vec![RIGHTSHIFT, TAB], ..Default::default() },
     Mapping { from: vec![GRAVE], to: vec![LEFTMETA], ..Default::default() },
     
     Mapping { from: vec![SPACE], to: vec![SPACE], repeat: Repeat::Disabled, ..Default::default() },
