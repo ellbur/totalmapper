@@ -5,7 +5,7 @@ use crate::keys::Layout;
 use nix::Error;
 use nix::errno::Errno::ENODEV;
 use crate::key_transforms;
-use crate::keyboard_listing::{filter_keyboards, list_keyboards};
+use crate::keyboard_listing::{filter_keyboards_verbose, list_keyboards};
 use crate::dev_input_rw::{DevInputReader, DevInputWriter, Exclusion};
 use std::thread::{spawn, JoinHandle};
 use std::path::{Path, PathBuf};
@@ -27,19 +27,20 @@ pub fn do_remapping_loop_all_devices(layout: &Layout) -> Result<(), String> {
   match list_keyboards() {
     Err(e) => Err(format!("Failed to get the list of keyboards: {}", e)),
     Ok(devs) => {
-      do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None)
+      do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None, false)
     }
   }
 }
 
-pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard: bool, layout: &Layout, tablet_mode_switch_device: &Option<&str>) -> Result<(), String> {
+pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard: bool, layout: &Layout, tablet_mode_switch_device: &Option<&str>, verbose: bool) -> Result<(), String> {
   if skip_non_keyboard {
-    match filter_keyboards(devices) {
+    match filter_keyboards_verbose(devices) {
       Err(e) => Err(format!("Failed to get list of devices: {}", e)),
       Ok(devs) => do_remapping_loop_these_devices(
         &devs.into_iter().map(|p| Path::new(p).to_path_buf()).collect(),
         layout,
-        &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf())
+        &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf()),
+        verbose
       )
     }
   }
@@ -47,15 +48,20 @@ pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard
     do_remapping_loop_these_devices(
       &devices.into_iter().map(|p| Path::new(p).to_path_buf()).collect(),
       layout,
-      &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf())
+      &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf()),
+      verbose
     )
   }
 }
 
-pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, tablet_mode_switch_device: &Option<PathBuf>) -> Result<(), String> {
+pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, tablet_mode_switch_device: &Option<PathBuf>, verbose: bool) -> Result<(), String> {
+  if verbose { eprintln!("Remapping {} devices.", devices.len()); }
+  
   let mut rws: Vec<RW> = Vec::new();
   
   for p in devices {
+    if verbose { eprintln!(" * {}", p.to_string_lossy()); }
+    
     let r = match DevInputReader::open(p.as_path(), Exclusion::WaitReleaseAndExclude, true) {
       Err(e) => Err(format!("Failed to open {:?} for reading: {}", p, e)),
       Ok(r) => Ok(r)
@@ -82,7 +88,7 @@ pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, 
     let local_layout = layout.clone();
     threads.push(spawn(move || {
       let mut driver = RealDriver { rw };
-      do_remapping_loop_one_device(&mut driver, local_layout)
+      do_remapping_loop_one_device(&mut driver, local_layout, verbose)
     }));
   }
   
@@ -249,13 +255,15 @@ impl Driver for RealDriver {
   }
 }
 
-fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Result<(), String> {
+fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout, verbose: bool) -> Result<(), String> {
   let mut mapper = key_transforms::Mapper::for_layout(&layout);
   let mut working_repeat: WorkingRepeat = WorkingRepeat::Idle;
   
   let mut poll = driver.register_poll()?;
   
   let mut in_tablet_mode: bool = false;
+  
+  if verbose { eprintln!("Starting remapping loop."); }
   
   loop {
     loop {
@@ -318,6 +326,7 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout) -> Res
                       break;
                     }
                     Next::End => {
+                      if verbose { eprintln!("Ending remapping loop because no more keyboard events."); }
                       return Ok(());
                     }
                     Next::One(ev_in) => {
@@ -529,8 +538,8 @@ mod tests {
     ops.push_back(TestOp::Send { evs: vec![Released(B)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
-    let mut driver = TestDriver { ops: ops };
-    do_remapping_loop_one_device(&mut driver, layout).unwrap();
+    let mut driver = TestDriver { ops };
+    do_remapping_loop_one_device(&mut driver, layout, true).unwrap();
     driver.finish();
   }
   
@@ -554,8 +563,8 @@ mod tests {
     ops.push_back(TestOp::NextKeyboard { result: Next::One(Released(A)) });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
-    let mut driver = TestDriver { ops: ops };
-    do_remapping_loop_one_device(&mut driver, layout).unwrap();
+    let mut driver = TestDriver { ops };
+    do_remapping_loop_one_device(&mut driver, layout, true).unwrap();
     driver.finish();
   }
   
@@ -605,8 +614,8 @@ mod tests {
     ops.push_back(TestOp::Send { evs: vec![Released(LEFTSHIFT)] });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
-    let mut driver = TestDriver { ops: ops };
-    do_remapping_loop_one_device(&mut driver, layout).unwrap();
+    let mut driver = TestDriver { ops };
+    do_remapping_loop_one_device(&mut driver, layout, true).unwrap();
     driver.finish();
   }
   
@@ -652,8 +661,8 @@ mod tests {
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
-    let mut driver = TestDriver { ops: ops };
-    do_remapping_loop_one_device(&mut driver, layout).unwrap();
+    let mut driver = TestDriver { ops };
+    do_remapping_loop_one_device(&mut driver, layout, true).unwrap();
     driver.finish();
   }
   
@@ -699,8 +708,8 @@ mod tests {
     ops.push_back(TestOp::Poll { timeout: None, result: PollResult::DeviceEvent(vec![Device::Keyboard]) });
     ops.push_back(TestOp::NextKeyboard { result: Next::End });
     
-    let mut driver = TestDriver { ops: ops };
-    do_remapping_loop_one_device(&mut driver, layout).unwrap();
+    let mut driver = TestDriver { ops };
+    do_remapping_loop_one_device(&mut driver, layout, true).unwrap();
     driver.finish();
   }
 }

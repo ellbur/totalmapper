@@ -82,6 +82,11 @@ fn main() {
           .help_heading(Some("TABLET MODE"))
           .about("Do not emit key events when the selected device indicates the computer is in tablet mode.")
         )
+        .arg(Arg::new("verbose")
+          .long("verbose")
+          .help_heading(Some("DEBUGGING"))
+          .about("Print verbose info.")
+        )
       )
       .subcommand(App::new("list_keyboards")
         .about("List keyboard devices under /dev/input")
@@ -173,7 +178,7 @@ fn main() {
           },
           (false, Some(devs)) => {
             let devs2 = devs.collect();
-            match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout, &m.value_of("tablet_mode_switch_device")) {
+            match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout, &m.value_of("tablet_mode_switch_device"), m.occurrences_of("verbose") > 0) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
