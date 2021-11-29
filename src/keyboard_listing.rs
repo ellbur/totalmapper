@@ -196,7 +196,7 @@ fn dev_path_for_sysfs_name(sysfs_name: &String) -> io::Result<Option<PathBuf>> {
   Ok(None)
 }
 
-pub fn filter_keyboards<'a>(devices: &Vec<&'a str>) -> io::Result<Vec<&'a str>> {
+pub fn filter_keyboards_verbose<'a>(devices: &Vec<&'a str>) -> io::Result<Vec<&'a str>> {
   let mut res = Vec::new();
   
   let all_keyboards = list_keyboards()?;
@@ -211,13 +211,20 @@ pub fn filter_keyboards<'a>(devices: &Vec<&'a str>) -> io::Result<Vec<&'a str>> 
   
   for s in devices {
     match canonicalize(Path::new(s)) {
-      Err(_) => (),
+      Err(_) => {
+        eprintln!("Skipping {} because could not canonicalize path", s);
+      },
       Ok(c) => {
         match c.to_str() {
-          None => (),
+          None => {
+            eprintln!("Skipping {} because could not c-strify path", s);
+          },
           Some(l) => {
             if canonical_set.contains(&l.to_string()) {
               res.push(*s)
+            }
+            else {
+              eprintln!("Skipping {} because {} is not in the list of keyboards", s, l);
             }
           }
         }
