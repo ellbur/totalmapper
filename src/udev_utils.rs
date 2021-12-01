@@ -8,6 +8,7 @@ use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
 use std::process::Command;
 use crate::keys::Layout;
+use crate::keyboard_listing::list_keyboards;
 
 fn convert_io_error<T>(whats_happening: &str, res: Result<T, std::io::Error>) -> Result<T, String> {
   match res {
@@ -338,6 +339,43 @@ fn refresh_systemd() -> Result<(), String> {
     Err(e) => Err(format!("Failed to reload systemd: {}", e)),
     Ok(_) => Ok(())
   }?;
+  
+  Ok(())
+}
+
+pub fn start_systemd_service() -> Result<(), String> {
+  for k in convert_io_error("listing keyboards", list_keyboards())? {
+    if let Some(p) = k.dev_path.to_str() {
+      eprintln!("Starting for {}", p);
+      let escaped_p = p.replace('/', "-");
+      let mut unit = "totalmapper@".to_string();
+      unit.push_str(&escaped_p);
+      match Command::new(find_program("systemctl")?).args(&["start", &unit]).status() {
+        Err(e) => {
+          Err(format!("Failed to run systemctl: {}", e))
+        },
+        Ok(c) => {
+          if let Some(code) = c.code() {
+            if code == 4 {
+              Err("Permission denied running systemctl. Likely you need to run this as root.".to_string())
+            }
+            else if code == 0 {
+              Ok(())
+            }
+            else {
+              Err(format!("systemctl failed with code {}", code))
+            }
+          }
+          else {
+            Err("systemctl terminated by signal".to_string())
+          }
+        }
+      }?;
+    }
+    else {
+      eprintln!("WARNING: failed to start for {:?} because couldn't handle non-UTF8 path", k.dev_path);
+    }
+  }
   
   Ok(())
 }

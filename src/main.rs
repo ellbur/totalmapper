@@ -148,6 +148,11 @@ fn main() {
           .help_heading(Some("LAYOUT SELECTION"))
           .about("Load a layout from json file FILE. To see an example of the form, print an example using `totalmapper print_default_layout caps-for-movement`.")
         )
+        .arg(Arg::new("and_start")
+          .long("and-start")
+          .help_heading(Some("RUNNING"))
+          .about("Also start the service for all existing keyboards")
+        )
       );
       
   let m = app.clone().get_matches();
@@ -252,7 +257,17 @@ fn main() {
             println!("{}", msg);
             std::process::exit(1);
           },
-          Ok(_) => ()
+          Ok(_) => {
+            if m.occurrences_of("and_start") > 0 {
+              match udev_utils::start_systemd_service() {
+                Err(msg) => {
+                  println!("{}", msg);
+                  std::process::exit(1);
+                },
+                Ok(_) => ()
+              };
+            }
+          }
         }
       }
     }
