@@ -304,7 +304,6 @@ fn write_systemd_service() -> Result<(), String> {
   
   match out_file.write(
     "[Unit]\n\
-    StopWhenUnneeded=true\n\
     Description=Totalmapper\n\
     \n\
     [Service]\n\
