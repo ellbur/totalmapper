@@ -173,7 +173,7 @@ fn main() {
             println!("Error: Must specify either --dev-file or --all-keyboards, not both");
           },
           (true, None) => {
-            match remapping_loop::do_remapping_loop_all_devices(&layout) {
+            match remapping_loop::do_remapping_loop_all_devices(&layout, m.occurrences_of("verbose") > 0) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
@@ -183,7 +183,13 @@ fn main() {
           },
           (false, Some(devs)) => {
             let devs2 = devs.collect();
-            match remapping_loop::do_remapping_loop_multiple_devices(&devs2, m.occurrences_of("only_if_keyboard") > 0, &layout, &m.value_of("tablet_mode_switch_device"), m.occurrences_of("verbose") > 0) {
+            match remapping_loop::do_remapping_loop_multiple_devices(
+                &devs2,
+                m.occurrences_of("only_if_keyboard") > 0,
+                &layout,
+                &m.value_of("tablet_mode_switch_device"),
+                m.occurrences_of("verbose") > 0)
+            {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
