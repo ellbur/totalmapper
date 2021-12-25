@@ -262,6 +262,7 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout, verbos
   let mut poll = driver.register_poll()?;
   
   let mut in_tablet_mode: bool = false;
+  let mut restart_count: i32 = 0;
   
   if verbose { eprintln!("Starting remapping loop."); }
   
@@ -280,7 +281,6 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout, verbos
         }
       };
       
-      let mut restart_count: i32 = 0;
       match driver.poll(&mut poll, timeout)? {
         PollResult::TimedOut => {
           match working_repeat {
@@ -310,6 +310,7 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout, verbos
           };
         },
         PollResult::Interrupted => {
+          if verbose { eprintln!("poll() interrupted"); }
           restart_count += 1;
           if restart_count > 1 {
             // Avoid burning the CPU if we keep getting interrupted for some reason
@@ -317,12 +318,14 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout, verbos
           }
         },
         PollResult::DeviceEvent(dev_evs) => {
+          restart_count = 0;
           for dev_ev in dev_evs {
             match dev_ev {
               Device::Keyboard => {
                 loop {
                   match driver.next_keyboard()? {
                     Next::Busy => {
+                      if verbose { eprintln!("poll() returned busy. Retrying."); }
                       break;
                     }
                     Next::End => {
