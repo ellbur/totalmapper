@@ -117,13 +117,14 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str) -
       let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
       let lacks_leds = !ev_set.contains(&0x11);
       let has_mouse_in_name = name.contains("Mouse");
+      let is_cros_ec = name == "cros_ec";
       
       let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
       
       let has_rel_motion = ev_set.contains(&0x2);
       
       // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && !has_rel_motion && !mousey {
+      if num_keys >= 20 && num_normal_keys >= 3 && !has_rel_motion && !mousey && !is_cros_ec {
         match &*working_sysfs_path {
           None => (),
           Some(p) => {

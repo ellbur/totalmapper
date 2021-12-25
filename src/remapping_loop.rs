@@ -23,11 +23,11 @@ use crate::keys::Event::{Pressed, Released};
 use crate::key_transforms::ResultingRepeat;
 use crate::tablet_mode_switch_reader::TableModeEvent;
 
-pub fn do_remapping_loop_all_devices(layout: &Layout) -> Result<(), String> {
+pub fn do_remapping_loop_all_devices(layout: &Layout, verbose: bool) -> Result<(), String> {
   match list_keyboards() {
     Err(e) => Err(format!("Failed to get the list of keyboards: {}", e)),
     Ok(devs) => {
-      do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None, false)
+      do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None, verbose)
     }
   }
 }
