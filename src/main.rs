@@ -54,7 +54,12 @@ fn main() {
         .arg(Arg::new("all_keyboards")
           .long("all-keyboards")
           .help_heading(Some("DEVICE SELECTION"))
-          .help("Remap all keyboards currently plugged in. Note that this will not affect keyboards you plug in after invoking this command. To automatically remap new keyboards, see the help for `totalmapper add_udev_rule`.")
+          .help("Remap all keyboards currently plugged in. Note that this will not affect keyboards you plug in after invoking this command. To automatically remap new keyboards, see --auto-all-keyboards or the command `totalmapper add_udev_rule`.")
+        )
+        .arg(Arg::new("auto_all_keyboards")
+          .long("auto-all-keyboards")
+          .help_heading(Some("DEVICE SELECTION"))
+          .help("Automatically remap keyboards as they are plugged in. Useful on systems that don't use systemd.")
         )
         .arg(Arg::new("default_layout")
           .long("default-layout")
@@ -165,14 +170,20 @@ fn main() {
         std::process::exit(1);
       },
       Ok(layout) => {
-        match (m.occurrences_of("all_keyboards") > 0, m.values_of("dev_file")) {
-          (false, None) => {
+        match (m.occurrences_of("all_keyboards") > 0, m.values_of("dev_file"), m.occurrences_of("auto_all_keyboards") > 0) {
+          (false, None, false) => {
             println!("Error: Must specify a least one --dev-file or --all-keyboards");
           },
-          (true, Some(_)) => {
-            println!("Error: Must specify either --dev-file or --all-keyboards, not both");
+          (true, Some(_), _) => {
+            println!("Error: Must specify either --dev-file, --all-keyboards, or --auto-all-keyboards, not both");
           },
-          (true, None) => {
+          (true, _, true) => {
+            println!("Error: Must specify either --dev-file, --all-keyboards, or --auto-all-keyboards, not both");
+          },
+          (_, Some(_), true) => {
+            println!("Error: Must specify either --dev-file, --all-keyboards, or --auto-all-keyboards, not both");
+          },
+          (true, _, _) => {
             match remapping_loop::do_remapping_loop_all_devices(&layout, m.occurrences_of("verbose") > 0) {
               Ok(_) => (),
               Err(err) => {
@@ -181,7 +192,7 @@ fn main() {
               }
             }
           },
-          (false, Some(devs)) => {
+          (_, Some(devs), _) => {
             let devs2 = devs.collect();
             match remapping_loop::do_remapping_loop_multiple_devices(
                 &devs2,
@@ -190,6 +201,15 @@ fn main() {
                 &m.value_of("tablet_mode_switch_device"),
                 m.occurrences_of("verbose") > 0)
             {
+              Ok(_) => (),
+              Err(err) => {
+                println!("Error: {}", err);
+                std::process::exit(1);
+              }
+            }
+          },
+          (_, _, true) => {
+            match remapping_loop::do_remapping_loop_auto_all_devices(&layout, m.occurrences_of("verbose") > 0) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);

@@ -8,6 +8,8 @@ use crate::key_transforms;
 use crate::keyboard_listing::{filter_keyboards_verbose, list_keyboards};
 use crate::dev_input_rw::{DevInputReader, DevInputWriter, Exclusion};
 use std::thread::{spawn, JoinHandle};
+use std::sync::Mutex;
+use std::sync::Arc;
 use std::path::{Path, PathBuf};
 use nix::errno::Errno::EAGAIN;
 use mio::{Interest, Poll, Token, Events};
@@ -22,6 +24,10 @@ use crate::keys::Event;
 use crate::keys::Event::{Pressed, Released};
 use crate::key_transforms::ResultingRepeat;
 use crate::tablet_mode_switch_reader::TableModeEvent;
+use inotify::{
+  Inotify,
+  WatchMask
+};
 
 pub fn do_remapping_loop_all_devices(layout: &Layout, verbose: bool) -> Result<(), String> {
   match list_keyboards() {
@@ -29,6 +35,95 @@ pub fn do_remapping_loop_all_devices(layout: &Layout, verbose: bool) -> Result<(
     Ok(devs) => {
       do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None, verbose)
     }
+  }
+}
+
+struct WorkingChild {
+  dev_path: PathBuf,
+  thread: JoinHandle<Result<(), String>>,
+  done: Arc<Mutex<bool>>
+}
+
+pub fn do_remapping_loop_auto_all_devices(layout: &Layout, verbose: bool) -> Result<(), String> {
+  let mut inotify = Inotify::init().expect("Error initializing");
+  inotify.add_watch("/dev/input", WatchMask::CREATE | WatchMask::ATTRIB)
+    .expect("Failed to add watch");
+
+  let mut children: Vec<WorkingChild> = Vec::new();
+  
+  loop {
+    if verbose {
+      eprintln!("Reaping finished devices");
+    }
+    for i in (0..children.len()).rev() {
+      let done = *children[i].done.lock().unwrap();
+      if verbose {
+        eprintln!(" * {:?}: done={}", children[i].dev_path, done);
+      }
+      if done {
+        match children.remove(i).thread.join().expect("Failed to join child") {
+          Ok(_) => {
+            if verbose {
+              eprintln!("    Joined.");
+            }
+          },
+          Err(msg) => {
+            eprintln!("Error from child: {}", msg);
+          }
+        };
+      }
+    }
+    
+    if verbose {
+      eprintln!("Getting the current list of keyboards");
+    }
+    
+    match list_keyboards() {
+      Err(e) => break Err(format!("Failed to get the list of keyboards: {}", e)),
+      Ok(devs) => {
+        if verbose {
+          eprintln!("Got the current list of keyboards:");
+          for dev in &devs {
+            eprintln!(" * {:?}", dev.dev_path);
+          }
+        }
+        
+        if verbose {
+          eprintln!("Checking which devices are already running:")
+        }
+        for dev in devs {
+          let already_have_it = children.iter().any(|c| c.dev_path == dev.dev_path);
+          if verbose { eprintln!(" * {:?}: {}", dev.dev_path, already_have_it); }
+          if !already_have_it {
+            match open_device(dev.dev_path.as_path(), &None) {
+              Err(msg) => {
+                eprintln!("Failed to open keyboard device: {}", msg)
+              },
+              Ok(mut driver) => {
+                let done = Arc::new(Mutex::new(false));
+
+                children.push(WorkingChild {
+                  dev_path: dev.dev_path,
+                  thread: {
+                    let done = Arc::clone(&done);
+                    let layout = layout.clone();
+                    spawn(move || {
+                      let res = do_remapping_loop_one_device(&mut driver, layout, verbose);
+                      *done.lock().unwrap() = true;
+                      res
+                    })
+                  },
+                  done
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    let mut buffer = [0; 1024];
+    inotify.read_events_blocking(&mut buffer).expect("Error reading events");
   }
 }
 
@@ -54,40 +149,44 @@ pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard
   }
 }
 
+fn open_device(path: &Path, tablet_mode_switch_device: &Option<PathBuf>) -> Result<RealDriver, String> {
+  let r = match DevInputReader::open(path, Exclusion::WaitReleaseAndExclude, true) {
+    Err(e) => Err(format!("Failed to open {:?} for reading: {}", path, e)),
+    Ok(r) => Ok(r)
+  }?;
+  
+  let w = match DevInputWriter::open() {
+    Err(e) => Err(format!("Failed to open /dev/uinput for writing: {}", e)),
+    Ok(w) => Ok(w)
+  }?;
+  
+  let t = match tablet_mode_switch_device {
+    None => Ok(None),
+    Some(path) => match TabletModeSwitchReader::open(path, true) {
+      Err(e) => Err(format!("Failed to open tablet mode device {:?} for reading: {}", path, e)),
+      Ok(t) => Ok(Some(t))
+    }
+  }?;
+  
+  let rw = RW { r, w, t };
+  
+  Ok(RealDriver { rw })
+}
+
 pub fn do_remapping_loop_these_devices(devices: &Vec<PathBuf>, layout: &Layout, tablet_mode_switch_device: &Option<PathBuf>, verbose: bool) -> Result<(), String> {
   if verbose { eprintln!("Remapping {} devices.", devices.len()); }
   
-  let mut rws: Vec<RW> = Vec::new();
+  let mut drivers: Vec<RealDriver> = Vec::new();
   
   for p in devices {
     if verbose { eprintln!(" * {}", p.to_string_lossy()); }
-    
-    let r = match DevInputReader::open(p.as_path(), Exclusion::WaitReleaseAndExclude, true) {
-      Err(e) => Err(format!("Failed to open {:?} for reading: {}", p, e)),
-      Ok(r) => Ok(r)
-    }?;
-    
-    let w = match DevInputWriter::open() {
-      Err(e) => Err(format!("Failed to open /dev/uinput for writing: {}", e)),
-      Ok(w) => Ok(w)
-    }?;
-    
-    let t = match tablet_mode_switch_device {
-      None => Ok(None),
-      Some(path) => match TabletModeSwitchReader::open(path, true) {
-        Err(e) => Err(format!("Failed to open tablet mode device {:?} for reading: {}", path, e)),
-        Ok(t) => Ok(Some(t))
-      }
-    }?;
-    
-    rws.push(RW { r, w, t });
+    drivers.push(open_device(p.as_path(), tablet_mode_switch_device)?);
   }
   
   let mut threads: Vec<JoinHandle<Result<(), String>>> = Vec::new();
-  for rw in rws.drain(..) {
+  for mut driver in drivers.drain(..) {
     let local_layout = layout.clone();
     threads.push(spawn(move || {
-      let mut driver = RealDriver { rw };
       do_remapping_loop_one_device(&mut driver, local_layout, verbose)
     }));
   }
@@ -325,7 +424,6 @@ fn do_remapping_loop_one_device(driver: &mut impl Driver, layout: Layout, verbos
                 loop {
                   match driver.next_keyboard()? {
                     Next::Busy => {
-                      if verbose { eprintln!("poll() returned busy. Retrying."); }
                       break;
                     }
                     Next::End => {

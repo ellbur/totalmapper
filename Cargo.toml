@@ -18,3 +18,4 @@ clap = "3.0.0-rc.7"
 lazy_static = "1.4.0"
 ioctls = "0.6.1"
 mio = { version = "0.7.7", features = ["os-ext"] }
+inotify = "0.10.0"
