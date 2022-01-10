@@ -63,6 +63,10 @@ If your system uses `systemd`, you can add a `udev` rule that will automatically
 
     sudo totalmapper add_systemd_service --default-layout caps-for-movement
 
+If your system does not use `systemd` (such as ChromeOS), you can have `totalmapper` monitor for new keyboards itself using `inotify`:
+
+    totalmapper remap --default-layout caps-for-movement --auto-all-keyboards
+
 # Defining layouts
 
 Layouts are defined with a simple JSON syntax:
