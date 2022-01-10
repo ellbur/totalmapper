@@ -5,12 +5,19 @@
 my $here = $*PROGRAM-NAME.IO.parent;
 my $repo-root = $here.add('..');
 
-run <docker create --name t1 --tty --volume>, "{$repo-root.absolute}:/home/ubuntu/tm", <ubuntu:20.10 sleep inf>;
-run <docker start t1>;
-run <docker exec t1 apt-get update -y>;
-run <docker exec t1 bash -c>, 'DEBIAN_FRONTEND=noninteractive apt-get install gcc rakudo curl lsb-release -y';
-run <docker exec t1 bash -c>, "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y";
-run <docker exec t1 bash -c>, 'source /root/.cargo/env && /home/ubuntu/tm/release-scripts/build-deb';
-run <docker stop t1>;
-run <docker rm t1>;
+run <docker create --name t1 --tty --volume>, "{$repo-root.absolute}:/home/ubuntu/tm", <ubuntu:20.04 sleep inf>;
+
+{
+  LEAVE run <docker rm t1>;
+  
+  run <docker start t1>;
+  {
+    LEAVE run <docker stop t1>;
+    
+    run <docker exec t1 apt-get update -y>;
+    run <docker exec t1 bash -c>, 'DEBIAN_FRONTEND=noninteractive apt-get install gcc rakudo curl lsb-release -y';
+    run <docker exec t1 bash -c>, "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y";
+    run <docker exec t1 bash -c>, 'source /root/.cargo/env && /home/ubuntu/tm/release-scripts/build-deb';
+  }
+}
 

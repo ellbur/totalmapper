@@ -3,7 +3,9 @@
 # vim: ft=perl6
 
 my $here = $*PROGRAM-NAME.IO.parent;
-my $repo-root = $here.add('..');
+my $repo-root-source = $here.add('..');
+my $repo-root = '/tmp/totalmapper'.IO;
+my $sink-dir = $here.add('../build/debs');
 
 my $version_rs_file = $repo-root.add('src/version.rs');
 my $deb_building_dir = $repo-root.add('deb-building');
@@ -12,6 +14,12 @@ my $exe_source = $repo-root.add('target/x86_64-unknown-linux-gnu/release/totalma
 my $tree_root = $deb_building_dir.add('totalmapper');
 my $control_file = $tree_root.add('DEBIAN/control');
 my $exe_sink = $tree_root.add('usr/bin/totalmapper');
+
+$sink-dir.mkdir;
+
+$repo-root.mkdir;
+run <cp -a -->, $repo-root-source.add('Cargo.toml'), $repo-root.add('Cargo.toml');
+run <cp -a -->, $repo-root-source.add('src'), $repo-root.add('src');
 
 my $version;
 given slurp $version_rs_file {
@@ -50,6 +58,6 @@ run <dpkg-deb --build totalmapper>, cwd => $deb_building_dir;
 my $release = q:x/lsb_release -c -s/.trim;
 
 my $deb_source_file = $deb_building_dir.add('totalmapper.deb');
-my $deb_sink_file = $deb_building_dir.add("totalmapper_{$version}-{$release}_amd64.deb");
+my $deb_sink_file = $sink-dir.add("totalmapper_{$version}-{$release}_amd64.deb");
 $deb_source_file.move($deb_sink_file);
 
