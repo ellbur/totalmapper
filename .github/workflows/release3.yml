@@ -31,7 +31,7 @@ jobs:
       - name: Build Impish
         run: ./release-scripts/build-impish
       - name: Make release
-        uses: softprops/action-gh-release@v0.1.5
+        uses: softprops/action-gh-release@v0.1.14
         with:
           fail_on_unmatched_files: true
           files: |
