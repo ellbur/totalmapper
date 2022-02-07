@@ -574,18 +574,7 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     old_key != k
   });
   
-  let repeat = match state.repeating_trigger {
-    Some(k2) => {
-      if k == k2 {
-        state.repeating_trigger = None;
-        ResultingRepeat::Disabled
-      }
-      else {
-        ResultingRepeat::NoChange
-      }
-    },
-    None => ResultingRepeat::Disabled
-  };
+  let repeat = ResultingRepeat::Disabled;
   
   StepResult { events, repeat }
 }
