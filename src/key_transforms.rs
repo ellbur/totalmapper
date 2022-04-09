@@ -232,23 +232,23 @@ fn is_action_mapping(m: &Mapping) -> bool {
   }
 }
 
+fn is_any_modifier(keys: &Vec<KeyCode>) -> bool {
+  keys.iter().any(|k| !is_action_key(k))
+}
+
 fn release_action_mappings(state: &mut State) -> Vec<Event> {
   let mut events = Vec::new();
   
   let mut keys_to_release: Vec<KeyCode> = Vec::new();
   for exsting_mapping in &state.active_mappings {
     if is_action_mapping(exsting_mapping) {
-      for mod_key in exsting_mapping.to.iter().rev() {
-        if state.mapped_output_keys.contains(mod_key) {
-          keys_to_release.push(*mod_key);
+      if exsting_mapping.to.len() > 1 && is_any_modifier(&exsting_mapping.to) {
+        for mod_key in exsting_mapping.to.iter().rev() {
+          if state.mapped_output_keys.contains(mod_key) {
+            keys_to_release.push(*mod_key);
+          }
         }
       }
-    }
-  }
-  
-  for k in &state.pass_through_keys {
-    if is_action_key(k) {
-      keys_to_release.push(*k);
     }
   }
   
@@ -742,9 +742,21 @@ mod tests {
     
     let mut mapper = Mapper::for_layout(&layout);
     
-    assert_eq!(StepResult { events: vec![Pressed(C)], repeat: ResultingRepeat::Disabled }, mapper.step(Pressed(A)));
-    assert_eq!(StepResult { events: vec![Released(C), Pressed(D), Released(D)], repeat: ResultingRepeat::Repeating { keys: vec![E], delay_ms: 130, interval_ms: 30 } }, mapper.step(Pressed(B)));
-    assert_eq!(StepResult { events: vec![], repeat: ResultingRepeat::NoChange }, mapper.step(Released(A)));
+    assert_eq!(
+      StepResult { events: vec![Pressed(C)], repeat: ResultingRepeat::Disabled },
+      mapper.step(Pressed(A))
+    );
+    assert_eq!(
+      StepResult {
+        events: vec![Pressed(D), Released(C), Released(D)],
+        repeat: ResultingRepeat::Repeating { keys: vec![E], delay_ms: 130, interval_ms: 30 }
+      },
+      mapper.step(Pressed(B))
+    );
+    assert_eq!(
+      StepResult { events: vec![], repeat: ResultingRepeat::Disabled },
+      mapper.step(Released(A))
+    );
   }
 
   #[test]
@@ -794,6 +806,38 @@ mod tests {
     assert_eq!(vec![Released(RIGHTSHIFT), Pressed(LEFTSHIFT), Pressed(APOSTROPHE)], mapper.step(Pressed(Z)).events);
     assert_eq!(vec![Released(APOSTROPHE), Released(LEFTSHIFT)], mapper.step(Released(Z)).events);
     assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(APOSTROPHE)], mapper.step(Pressed(Z)).events);
+  }
+  
+  #[test]
+  fn allowed_overlapping_test_1() {
+    // This tests, where possible, overlapping keys are allowed.
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![A], to: vec![B], ..Default::default() },
+        Mapping { from: vec![C], to: vec![D], ..Default::default() },
+      ]
+    };
+    
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    assert_eq!(vec![Pressed(B)], mapper.step(Pressed(A)).events);
+    assert_eq!(vec![Pressed(D)], mapper.step(Pressed(C)).events);
+  }
+  
+  #[test]
+  fn disallowed_overlapping_test_1() {
+    // This tests that certain problematic overlaps are rejected
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![A], to: vec![LEFTSHIFT, B], ..Default::default() },
+        Mapping { from: vec![C], to: vec![D], ..Default::default() },
+      ]
+    };
+    
+    let mut mapper = Mapper::for_layout(&layout);
+    
+    assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(B)], mapper.step(Pressed(A)).events);
+    assert_eq!(vec![Released(B), Released(LEFTSHIFT), Pressed(D)], mapper.step(Pressed(C)).events);
   }
 }
 
