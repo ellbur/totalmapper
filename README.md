@@ -41,9 +41,7 @@ With [`cargo`](https://doc.rust-lang.org/cargo/):
 
 Try one of the builtin layouts with:
 
-    sleep 1 ; totalmapper remap --default-layout caps-for-movement --all-keyboards
-
-(`sleep` gives you time to release the enter key when running the command.)
+    totalmapper remap --default-layout caps-for-movement --all-keyboards
 
 See the list of builtin layouts with:
 
@@ -65,7 +63,7 @@ If your system uses `systemd`, you can add a `udev` rule that will automatically
 
 This will install a service definition in `/etc/systemd/system/totalmapper@.service` that will run `totalmapper` under a new user (`totalmapper`) in the `input` group.
 
-If your system does not use `systemd` (such as ChromeOS), you can have `totalmapper` monitor for new keyboards itself using `inotify`:
+If your system does not use `systemd` (such as ChromeOS), you can have `totalmapper` monitor for new keyboards itself:
 
     totalmapper remap --default-layout caps-for-movement --auto-all-keyboards
 
@@ -108,6 +106,8 @@ For example, the following mapping would trigger when pressing the key that maps
 ```json
 { "from": [ "J" ], "to": [ "DOWN" ] }
 ```
+
+To figure out what keycodes your keyboard uses, you may use `evtest`.
 
 ## Remapping
 
