@@ -14,8 +14,13 @@ pub enum Event {
 pub use Event::Pressed;
 pub use Event::Released;
 
+pub enum Mapping {
+  Basic(BasicMapping),
+  Transliterate(TransliterateMapping)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Mapping {
+pub struct BasicMapping {
   pub from: Vec<KeyCode>,
   pub to: Vec<KeyCode>,
   #[serde(default = "normal_repeat")]
@@ -24,15 +29,26 @@ pub struct Mapping {
   pub absorbing: Vec<KeyCode>
 }
 
-impl Default for Mapping {
+impl Default for BasicMapping {
   fn default() -> Self {
-    Mapping {
+    BasicMapping {
       from: vec![],
       to: vec![],
       repeat: Repeat::Normal,
       absorbing: vec![]
     }
   }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransliterateMapping {
+  pub from_row: String,
+  pub from_modifiers: Vec<KeyCode>,
+  pub to_row: String,
+  #[serde(default = "normal_repeat")]
+  pub repeat: Repeat,
+  #[serde(default = "Vec::new")]
+  pub absorbing: Vec<KeyCode>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
