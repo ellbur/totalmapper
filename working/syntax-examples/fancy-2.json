@@ -1,0 +1,9 @@
+{
+  "mappings": {
+    { "from": "CAPSLOCK", "to": "@symbol" },
+    { "from": "RIGHTALT", "to": "@symbol" },
+    { "from": ["@symbol", {"row": "Q"}], "to": {"letters": " {}% \\*][|"} },
+    { "from": ["@symbol", {"row": "A"}], "to": {"letters": "   = &)(/_$"} },
+    { "from": ["@symbol", {"row": "Z"}], "to": {"letters": "\"    !+#"} }
+  }
+}

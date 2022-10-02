@@ -1,11 +1,10 @@
 
 // vim: shiftwidth=2
  
-use serde::{Deserialize, Serialize};
 pub use crate::key_codes::KeyCode; 
 use std::default::Default;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Event {
   Pressed(KeyCode),
   Released(KeyCode)
@@ -16,16 +15,21 @@ pub use Event::Released;
 
 pub enum Mapping {
   Basic(BasicMapping),
-  Transliterate(TransliterateMapping)
+  AliasDefinition(AliasDefinitionMapping),
+  RowToLetters(RowToLettersMapping)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Modifier {
+  KeyModifier(KeyCode),
+  AliasModifier(String)
+}
+
+#[derive(Debug, Clone)]
 pub struct BasicMapping {
-  pub from: Vec<KeyCode>,
+  pub fromModifiers: Vec<Modifier>,
+  pub fromKey: KeyCode,
   pub to: Vec<KeyCode>,
-  #[serde(default = "normal_repeat")]
   pub repeat: Repeat,
-  #[serde(default = "Vec::new")]
   pub absorbing: Vec<KeyCode>
 }
 
@@ -40,18 +44,21 @@ impl Default for BasicMapping {
   }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransliterateMapping {
-  pub from_row: String,
-  pub from_modifiers: Vec<KeyCode>,
-  pub to_row: String,
-  #[serde(default = "normal_repeat")]
-  pub repeat: Repeat,
-  #[serde(default = "Vec::new")]
-  pub absorbing: Vec<KeyCode>
+#[derive(Debug, Clone)]
+pub struct AliasDefinitionMapping {
+  pub fromModifiers: Vec<Modifier>,
+  pub toAlsoKeys: Vec<KeyCode>,
+  pub resultingModifier: String
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+pub struct RowToLettersMapping {
+  pub fromModifiers: Vec<Modifier>,
+  pub fromRowFirstKey: String,
+  pub toLetters: String
+}
+
+#[derive(Debug, Clone)]
 pub enum Repeat {
   Normal,
   Disabled,
@@ -66,7 +73,7 @@ pub fn normal_repeat() -> Repeat {
   Repeat::Normal
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct Layout {
   pub mappings: Vec<Mapping>
 }

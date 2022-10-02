@@ -1,0 +1,16 @@
+{
+  "mappings": {
+    { "from": "CAPSLOCK", "to": "@movement" },
+    { "from": "RIGHTALT", "to": "@movement" },
+    { "from": [ "@movement", "J" ], "to": [ "LEFT" ] },
+    { "from": [ "@movement", "I" ], "to": [ "UP" ] },
+    { "from": [ "@movement", "K" ], "to": [ "DOWN" ] },
+    { "from": [ "@movement", "L" ], "to": [ "RIGHT" ] },
+    { "from": [ "@movement", "H" ], "to": [ "HOME" ] },
+    { "from": [ "@movement", "SEMICOLON" ], "to": [ "END" ] },
+    { "from": [ "@movement", "U" ], "to": [ "PAGEUP" ] },
+    { "from": [ "@movement", "M" ], "to": [ "PAGEDOWN" ] },
+    { "from": [ "@movement", "N" ], "to": [ "LEFTCTRL", "LEFT" ] },
+    { "from": [ "@movement", "COMMA" ], "to": [ "LEFTCTRL", "RIGHT" ] }
+  }
+}
