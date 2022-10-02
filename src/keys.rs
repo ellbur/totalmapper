@@ -22,8 +22,8 @@ pub enum Mapping {
 
 #[derive(Debug, Clone)]
 pub enum Modifier {
-  KeyModifier(KeyCode),
-  AliasModifier(String)
+  Key(KeyCode),
+  Alias(String)
 }
 
 #[derive(Debug, Clone)]
