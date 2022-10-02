@@ -26,8 +26,6 @@ jobs:
         run: ./release-scripts/build-raw-aarch64
       - name: Build Focal
         run: ./release-scripts/build-focal
-      - name: Build Hirsute
-        run: ./release-scripts/build-hirsute
       - name: Build Impish
         run: ./release-scripts/build-impish
       - name: Make release
