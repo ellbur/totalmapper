@@ -13,12 +13,14 @@ pub enum Event {
 pub use Event::Pressed;
 pub use Event::Released;
 
+#[derive(Debug, Clone)]
 pub enum Mapping {
   Basic(BasicMapping),
   AliasDefinition(AliasDefinitionMapping),
   RowToLetters(RowToLettersMapping)
 }
 
+#[derive(Debug, Clone)]
 pub enum Modifier {
   KeyModifier(KeyCode),
   AliasModifier(String)
@@ -26,8 +28,8 @@ pub enum Modifier {
 
 #[derive(Debug, Clone)]
 pub struct BasicMapping {
-  pub fromModifiers: Vec<Modifier>,
-  pub fromKey: KeyCode,
+  pub from_modifiers: Vec<Modifier>,
+  pub from_key: KeyCode,
   pub to: Vec<KeyCode>,
   pub repeat: Repeat,
   pub absorbing: Vec<KeyCode>
@@ -36,7 +38,8 @@ pub struct BasicMapping {
 impl Default for BasicMapping {
   fn default() -> Self {
     BasicMapping {
-      from: vec![],
+      from_modifiers: vec![],
+      from_key: KeyCode::SPACE,
       to: vec![],
       repeat: Repeat::Normal,
       absorbing: vec![]
@@ -46,16 +49,16 @@ impl Default for BasicMapping {
 
 #[derive(Debug, Clone)]
 pub struct AliasDefinitionMapping {
-  pub fromModifiers: Vec<Modifier>,
-  pub toAlsoKeys: Vec<KeyCode>,
-  pub resultingModifier: String
+  pub from_modifiers: Vec<Modifier>,
+  pub to_also_keys: Vec<KeyCode>,
+  pub resulting_modifier: String
 }
 
 #[derive(Debug, Clone)]
 pub struct RowToLettersMapping {
-  pub fromModifiers: Vec<Modifier>,
-  pub fromRowFirstKey: String,
-  pub toLetters: String
+  pub from_modifiers: Vec<Modifier>,
+  pub from_row_first_key: String,
+  pub to_letters: String
 }
 
 #[derive(Debug, Clone)]
