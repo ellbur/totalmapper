@@ -4,7 +4,7 @@ use std::str::FromStr;
 use key_codes::KeyCode;
 use serde_json::{Value, Map};
 use Value::{Object, Array};
-use crate::{keys::{Layout, Mapping, AliasDefinitionMapping, Modifier}, key_codes};
+use crate::{fancy_keys::{Layout, Mapping, Modifier, FromKeys, FromKey, ToKeys, InitialToKey, TerminalToKey, Repeat}, key_codes};
 use serde_json::Value as j;
 
 pub fn parse_layout_from_json(root: &Value) -> Result<Layout, String> {
@@ -46,41 +46,10 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
   match mapping_v {
     Object(mapping_values) => {
       if has_at_least_keys(mapping_values, &vec!["from", "to"]) {
-        let from = mapping_values.get("from").unwrap();
-        let to = mapping_values.get("to").unwrap();
+        let from = parse_from(mapping_values.get("from").unwrap());
+        let to = parse_to(mapping_values.get("to").unwrap());
         
-        if let j::String(to_text) = to {
-          if to_text.starts_with("@") {
-            return parse_alias_definition(mapping_values);
-          }
-        }
-        else if let Array(to_items) = to {
-          if !to_items.is_empty() {
-            if let j::String(to_text) = to_items.last().unwrap() {
-              if to_text.starts_with("@") {
-                return parse_alias_definition(mapping_values);
-              }
-            }
-          }
-        }
-        
-        if let Object(from_values) = from {
-          if from_values.contains_key("row") {
-            return parse_row_to_letters(mapping_values);
-          }
-        }
-        else if let Array(from_items) = from {
-          if !from_items.is_empty() {
-            let last_from_item = from_items.last().unwrap();
-            if let Object(last_from_values) = last_from_item {
-              if last_from_values.contains_key("row") {
-                return parse_row_to_letters(mapping_values);
-              }
-            }
-          }
-        }
-        
-        parse_basic_mapping(mapping_values)
+        todo!()
       }
       else {
         return Err("Mapping must have \"from\" and \"to\"".to_owned())
@@ -89,6 +58,54 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
     _ => {
       return Err("Each \"mapping\" must be an object".to_owned())
     }
+  }
+}
+
+fn parse_from(from_v: &Value) -> Result<FromKeys, String> {
+  if let j::String(from_text) = from_v {
+    Ok(FromKeys {
+      modifiers: vec![],
+      key: parse_from_key_text(from_text)?
+    })
+  }
+  else if Object(from_obj) = from_v {
+    if has_exactly_keys(from_obj, &vec!["row"]) {
+      Ok(FromKeys {
+        modifiers: vec![],
+        key: parse_from_row(from_obj)
+      })
+    }
+    else {
+      Err(format!("Don't understand `from` object with keys {}, expected possibly key `row`",
+          keys_string(from_obj)))
+    }
+  }
+  else if Array(from_elems) = from_v {
+    todo!()
+  }
+  else {
+    todo!()
+  }
+}
+
+fn parse_from_row(elems: Map<String, Value>) -> Result<FromKey, String> {
+  todo!()
+}
+
+fn parse_from_key_text(from_text: &str) -> Result<FromKey, String> {
+  Ok(FromKey::Single(parse_key_code(from_text)?))
+}
+
+fn parse_to(to_v: &Value) -> Result<ToKeys, String> {
+  todo!()
+}
+
+fn parse_key_code(text: &str) -> Result<KeyCode, String> {
+  if text.starts_with("@") {
+    Err(format!("A real key was expected, but alias modifier {} was found", text))
+  }
+  else {
+    KeyCode::from_str(&text).map_err(|_| format!("Unknown key code: {}", text))
   }
 }
 
@@ -161,14 +178,6 @@ fn parse_alias_definition(values: &Map<String, Value>) -> Result<Mapping, String
   }))
 }
 
-fn parse_row_to_letters(values: &Map<String, Value>) -> Result<Mapping, String> {
-  todo!()
-}
-
-fn parse_basic_mapping(values: &Map<String, Value>) -> Result<Mapping, String> {
-  todo!()
-}
-
 fn parse_modifier(text: &str) -> Result<Modifier, String> {
   if text.starts_with("@") {
     Ok(Modifier::Alias(text.to_owned()))
@@ -176,6 +185,11 @@ fn parse_modifier(text: &str) -> Result<Modifier, String> {
   else {
     Ok(Modifier::Key(KeyCode::from_str(&text).map_err(|_| format!("Unknown key: {}", text))?))
   }
+}
+
+fn keys_string(values: &Map<String, Value>) -> String {
+  let mut v1: Vec<&str> = values.keys().map(|s|s.as_str()).collect();
+  v1.join(", ")
 }
 
 fn has_exactly_keys(values: &Map<String, Value>, check: &Vec<&str>) -> bool {

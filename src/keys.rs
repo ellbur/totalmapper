@@ -1,10 +1,11 @@
 
 // vim: shiftwidth=2
  
+use serde::{Deserialize, Serialize};
 pub use crate::key_codes::KeyCode; 
 use std::default::Default;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Event {
   Pressed(KeyCode),
   Released(KeyCode)
@@ -13,33 +14,20 @@ pub enum Event {
 pub use Event::Pressed;
 pub use Event::Released;
 
-#[derive(Debug, Clone)]
-pub enum Mapping {
-  Basic(BasicMapping),
-  AliasDefinition(AliasDefinitionMapping),
-  RowToLetters(RowToLettersMapping)
-}
-
-#[derive(Debug, Clone)]
-pub enum Modifier {
-  Key(KeyCode),
-  Alias(String)
-}
-
-#[derive(Debug, Clone)]
-pub struct BasicMapping {
-  pub from_modifiers: Vec<Modifier>,
-  pub from_key: KeyCode,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Mapping {
+  pub from: Vec<KeyCode>,
   pub to: Vec<KeyCode>,
+  #[serde(default = "normal_repeat")]
   pub repeat: Repeat,
+  #[serde(default = "Vec::new")]
   pub absorbing: Vec<KeyCode>
 }
 
-impl Default for BasicMapping {
+impl Default for Mapping {
   fn default() -> Self {
-    BasicMapping {
-      from_modifiers: vec![],
-      from_key: KeyCode::SPACE,
+    Mapping {
+      from: vec![],
       to: vec![],
       repeat: Repeat::Normal,
       absorbing: vec![]
@@ -47,21 +35,7 @@ impl Default for BasicMapping {
   }
 }
 
-#[derive(Debug, Clone)]
-pub struct AliasDefinitionMapping {
-  pub from_modifiers: Vec<Modifier>,
-  pub to_also_keys: Vec<KeyCode>,
-  pub resulting_modifier: String
-}
-
-#[derive(Debug, Clone)]
-pub struct RowToLettersMapping {
-  pub from_modifiers: Vec<Modifier>,
-  pub from_row_first_key: String,
-  pub to_letters: String
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Repeat {
   Normal,
   Disabled,
@@ -76,7 +50,7 @@ pub fn normal_repeat() -> Repeat {
   Repeat::Normal
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Layout {
   pub mappings: Vec<Mapping>
 }
