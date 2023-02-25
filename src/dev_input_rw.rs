@@ -152,6 +152,9 @@ impl DevInputWriter {
       ui_set_evbit(fdo, EV_MSC);
     }
     
+    // FYI for people considering adding more keys: be careful not to
+    // add keys above 562, as this will cause the keyboard not to be
+    // detected as a keyboard by wlroots window managers such as sway.
     for i in 1 .. 562 {
       unsafe { ui_set_keybit(fdo, i); }
     }

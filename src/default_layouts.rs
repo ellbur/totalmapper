@@ -223,6 +223,27 @@ fn _super_dvorak() -> Layout {
     Mapping { from: vec![RIGHTSHIFT, M], to: vec![RIGHTSHIFT, M], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
     Mapping { from: vec![RIGHTSHIFT, COMMA], to: vec![RIGHTSHIFT, W], repeat: Repeat::Disabled, absorbing: vec![RIGHTSHIFT], ..Default::default() },
     
+    Mapping { from: vec![LEFTSHIFT, CAPSLOCK, SEMICOLON], to: vec![RIGHTALT, S], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, CAPSLOCK, SEMICOLON], to: vec![RIGHTALT, S], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, RIGHTALT, SEMICOLON], to: vec![RIGHTALT, S], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, RIGHTALT, SEMICOLON], to: vec![RIGHTALT, S], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, LEFTMETA, SEMICOLON], to: vec![RIGHTALT, S], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, LEFTMETA, SEMICOLON], to: vec![RIGHTALT, S], repeat: Repeat::Disabled, ..Default::default() },
+    
+    Mapping { from: vec![LEFTSHIFT, CAPSLOCK, R], to: vec![RIGHTALT, P], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, CAPSLOCK, R], to: vec![RIGHTALT, P], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, RIGHTALT, R], to: vec![RIGHTALT, P], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, RIGHTALT, R], to: vec![RIGHTALT, P], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, LEFTMETA, R], to: vec![RIGHTALT, P], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, LEFTMETA, R], to: vec![RIGHTALT, P], repeat: Repeat::Disabled, ..Default::default() },
+    
+    Mapping { from: vec![LEFTSHIFT, CAPSLOCK, SPACE], to: vec![RIGHTALT, N], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, CAPSLOCK, SPACE], to: vec![RIGHTALT, N], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, RIGHTALT, SPACE], to: vec![RIGHTALT, N], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, RIGHTALT, SPACE], to: vec![RIGHTALT, N], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![LEFTSHIFT, LEFTMETA, SPACE], to: vec![RIGHTALT, N], repeat: Repeat::Disabled, ..Default::default() },
+    Mapping { from: vec![RIGHTSHIFT, LEFTMETA, SPACE], to: vec![RIGHTALT, N], repeat: Repeat::Disabled, ..Default::default() },
+    
     Mapping { from: vec![TAB], to: vec![], ..Default::default() },
     Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() }, 
     Mapping { from: vec![TAB, I], to: vec![UP], ..Default::default() }, 
