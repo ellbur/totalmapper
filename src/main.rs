@@ -2,6 +2,7 @@
 // vim: shiftwidth=2
  
 mod key_codes;
+mod events;
 mod keys;
 mod fancy_keys;
 mod key_transforms;

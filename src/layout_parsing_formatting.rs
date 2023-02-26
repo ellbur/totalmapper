@@ -1,10 +1,9 @@
 
-use std::{str::FromStr, f32::consts::E};
-
+use std::str::FromStr;
 use key_codes::KeyCode;
 use serde_json::{Value, Map};
 use Value::{Object, Array};
-use crate::{fancy_keys::{Layout, Mapping, Modifier, FromKeys, FromKey, ToKeys, InitialToKey, TerminalToKey, Repeat}, key_codes};
+use crate::{fancy_keys::{Layout, Mapping, Modifier, FromKeys, FromKey, ToKeys, TerminalToKey, Repeat}, key_codes};
 use serde_json::Value as j;
 
 pub fn parse_layout_from_json(root: &Value) -> Result<Layout, String> {
@@ -151,7 +150,91 @@ fn parse_from_key_obj(obj: &Map<String, Value>) -> Result<FromKey, String> {
 }
 
 fn parse_to(to_v: &Value) -> Result<ToKeys, String> {
-  todo!()
+  if let j::Array(to_elems) = to_v {
+    parse_to_array(to_elems)
+  }
+  else {
+    Ok(ToKeys {
+      initial: vec![],
+      terminal: parse_to_terminal(to_v)?
+    })
+  }
+}
+
+fn parse_to_terminal(to_v: &Value) -> Result<TerminalToKey, String> {
+  if let j::String(to_text) = to_v {
+    parse_to_text(to_text)
+  }
+  else if let j::Object(to_attrs) = to_v {
+    parse_to_obj(to_attrs)
+  }
+  else {
+    Err(format!("`to` should be a string, array, or object; found {}", to_v))
+  }
+  
+}
+
+fn parse_to_text(to_text: &str) -> Result<TerminalToKey, String> {
+  if to_text.starts_with("@") {
+    Ok(TerminalToKey::Alias(to_text.to_owned()))
+  }
+  else {
+    Ok(TerminalToKey::Physical(KeyCode::from_str(&to_text).map_err(|_| format!("Unknown key code: {}", to_text))?))
+  }
+}
+
+fn parse_to_array(to_elems: &[Value]) -> Result<ToKeys, String> {
+  if to_elems.len() == 0 {
+    Ok(ToKeys {
+      initial: vec![],
+      terminal: TerminalToKey::Null
+    })
+  }
+  else {
+    Ok(ToKeys {
+      initial: parse_to_initial(&to_elems[0..to_elems.len()-1])?,
+      terminal: parse_to_terminal(&to_elems[to_elems.len()-1])?
+    })
+  }
+}
+
+fn parse_to_initial(initial_elems: &[Value]) -> Result<Vec<Modifier>, String> {
+  let mut res = vec![];
+  
+  for elem in initial_elems {
+    res.push(parse_to_initial_elem(elem)?);
+  }
+  
+  Ok(res)
+}
+
+fn parse_to_initial_elem(elem: &Value) -> Result<Modifier, String> {
+  if let j::String(text) = elem {
+    if text.starts_with("@") {
+      Ok(Modifier::Alias(text.to_owned()))
+    }
+    else {
+      Ok(Modifier::Key(KeyCode::from_str(&text).map_err(|_| format!("Unknown key code: {}", text))?))
+    }
+  }
+  else {
+    Err(format!("Modifier must be a string, found {}", elem))
+  }
+}
+
+fn parse_to_obj(to_attrs: &Map<String, Value>) -> Result<TerminalToKey, String> {
+  if has_exactly_keys(to_attrs, &vec!["letters"]) {
+    let letters = to_attrs.get("letters").unwrap();
+    if let j::String(letters_text) = letters {
+      Ok(TerminalToKey::Letters(letters_text.to_owned()))
+    }
+    else {
+      Err(format!("`letters` must be a string, found {}", letters))
+    }
+  }
+  else {
+    Err(format!("`to` object of unrecognized form {}, expected, for example, `letters`", j::Object(to_attrs.clone())))
+  }
 }
 
 fn parse_key_code(text: &str) -> Result<KeyCode, String> {
@@ -173,15 +256,104 @@ fn parse_modifier(text: &str) -> Result<Modifier, String> {
 }
 
 fn parse_repeat(v: &Option<&Value>) -> Result<Repeat, String> {
-  todo!()
+  if let Some(v) = v {
+    if let j::String(text) = v {
+      if text.to_lowercase() == "normal" {
+        Ok(Repeat::Normal)
+      }
+      else if text.to_lowercase() == "disabled" {
+        Ok(Repeat::Disabled)
+      }
+      else {
+        Err(format!("Unrecognized repeat style: {}", text))
+      }
+    }
+    else if let j::Object(params) = v {
+      if has_exactly_keys(params, &vec!["Special"]) {
+        let special = params.get("Special").unwrap();
+        if let j::Object(special) = special {
+          if has_exactly_keys(special, &vec!["keys", "delay_ms", "interval_ms"]) {
+            let keys = special.get("keys").unwrap();
+            let delay_ms = special.get("delay_ms").unwrap();
+            let interval_ms = special.get("interval_ms").unwrap();
+            
+            Ok(Repeat::Special {
+              keys: parse_repeat_keys(keys)?,
+              delay_ms: parse_repeat_delay_ms(delay_ms)?,
+              interval_ms: parse_repeat_interval_ms(interval_ms)?
+            })
+          }
+          else {
+            Err(format!("`Special` repeat must have attributes `keys`, `delay_ms`, and `interval_ms`, found {}", keys_string(special)))
+          }
+        }
+        else {
+          Err(format!("`Special` repeat must be an object, found {}", special))
+        }
+      }
+      else {
+        Err(format!("Unknown repeat style: {}", v))
+      }
+    }
+    else {
+      Err(format!("Unknown repeat style: {}", v))
+    }
+  }
+  else {
+    Ok(Repeat::Normal)
+  }
+}
+
+fn parse_repeat_keys(v: &Value) -> Result<ToKeys, String> {
+  parse_to(v)
+}
+
+fn parse_repeat_delay_ms(v: &Value) -> Result<i32, String> {
+  if let j::Number(n) = v {
+    Ok(n.as_i64().ok_or(format!("Invalid delay_ms number: {}", v))? as i32)
+  }
+  else {
+    Err(format!("delay_ms must be a number, found {}", v))
+  }
+}
+
+fn parse_repeat_interval_ms(v: &Value) -> Result<i32, String> {
+  if let j::Number(n) = v {
+    Ok(n.as_i64().ok_or(format!("Invalid interval_ms number: {}", v))? as i32)
+  }
+  else {
+    Err(format!("interval_ms must be a number, found {}", v))
+  }
 }
 
 fn parse_absorbing(v: &Option<&Value>) -> Result<Vec<Modifier>, String> {
-  todo!()
+  if let Some(v) = v {
+    if let j::Array(elems) = v {
+      let mut res = vec![];
+      for elem in elems {
+        if let j::String(elem) = elem {
+          res.push(parse_modifier(elem)?);
+        }
+        else {
+          Err(format!("`absorbing` must be a list of modifiers, found {}", elem))?;
+        }
+      }
+      Ok(res)
+    }
+    else if let j::String(elem) = v {
+      Ok(vec![parse_modifier(elem)?])
+    }
+    else {
+      Err(format!("`absorbing` must be a list of modifiers, found {}", v))
+    }
+  }
+  else {
+    Ok(vec![])
+  }
 }
 
 fn keys_string(values: &Map<String, Value>) -> String {
-  let mut v1: Vec<&str> = values.keys().map(|s|s.as_str()).collect();
+  let v1: Vec<&str> = values.keys().map(|s|s.as_str()).collect();
   v1.join(", ")
 }
 
@@ -200,5 +372,72 @@ fn has_at_least_keys(values: &Map<String, Value>, check: &Vec<&str>) -> bool {
     }
   }
   true
+}
+
+#[cfg(test)]
+mod tests {
+  use std::str::FromStr;
+  use crate::fancy_keys::{Layout, Mapping, FromKeys, FromKey, Modifier, ToKeys, TerminalToKey, Repeat};
+  use super::parse_layout_from_json;
+  use crate::key_codes::KeyCode::*;
+
+  #[test]
+  fn test_parsing_1() {
+    let text = r#"{
+  "mappings": [
+    { "from": "CAPSLOCK", "to": "@symbol" },
+    { "from": "RIGHTALT", "to": "@symbol" }
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let parsed = parse_layout_from_json(&json).unwrap();
+    assert_eq!(parsed, Layout {
+      mappings: vec![
+        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(CAPSLOCK) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(RIGHTALT) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] }
+      ]
+    });
+  }
+
+  #[test]
+  fn test_parsing_2() {
+    let text = r#"{
+  "mappings": [
+    { "from": "CAPSLOCK", "to": "@symbol" },
+    { "from": "RIGHTALT", "to": "@symbol" },
+    { "from": ["@symbol", {"row": "Q"}], "to": {"letters": " {}% \\*][|"} },
+    { "from": ["@symbol", {"row": "A"}], "to": {"letters": "   = &)(/_$"} },
+    { "from": ["@symbol", {"row": "Z"}], "to": {"letters": "\"    !+#"} }
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let parsed = parse_layout_from_json(&json).unwrap();
+    assert_eq!(parsed, Layout {
+      mappings: vec![
+        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(CAPSLOCK) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(RIGHTALT) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+      
+        Mapping { from: FromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], key: FromKey::Row("Q".to_owned()) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Letters(" {}% \\*][|".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+        Mapping { from: FromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], key: FromKey::Row("A".to_owned()) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Letters("   = &)(/_$".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+        Mapping { from: FromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], key: FromKey::Row("Z".to_owned()) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Letters("\"    !+#".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+      ]
+    });
+  }
+
+  #[test]
+  fn test_parsing_3() {
+    let text = r#"{
+  "mappings": [
+    {"from":["COMMA"], "to":["W"], "repeat":{"Special":{"keys":["LEFTCTRL","F24"], "delay_ms":180, "interval_ms":30}}, "absorbing":[]}
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let parsed = parse_layout_from_json(&json).unwrap();
+    assert_eq!(parsed, Layout {
+      mappings: vec![
+        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(COMMA) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Physical(W) }, repeat: Repeat::Special { keys: ToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: TerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: vec![] }
+      ]
+    });
+  }
 }
 

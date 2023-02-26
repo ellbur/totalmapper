@@ -1,5 +1,5 @@
 {
-  "mappings": {
+  "mappings": [
     { "from": "CAPSLOCK", "to": "@movement" },
     { "from": "RIGHTALT", "to": "@movement" },
     { "from": [ "@movement", "J" ], "to": [ "LEFT" ] },
@@ -12,5 +12,5 @@
     { "from": [ "@movement", "M" ], "to": [ "PAGEDOWN" ] },
     { "from": [ "@movement", "N" ], "to": [ "LEFTCTRL", "LEFT" ] },
     { "from": [ "@movement", "COMMA" ], "to": [ "LEFTCTRL", "RIGHT" ] }
-  }
+  ]
 }

@@ -2,17 +2,16 @@
 // vim: shiftwidth=2
  
 pub use crate::key_codes::KeyCode; 
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Event {
-  Pressed(KeyCode),
-  Released(KeyCode)
-}
-
+pub use crate::events::Event;
 pub use Event::Pressed;
 pub use Event::Released;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Layout {
+  pub mappings: Vec<Mapping>
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mapping {
   pub from: FromKeys,
   pub to: ToKeys,
@@ -20,44 +19,39 @@ pub struct Mapping {
   pub absorbing: Vec<Modifier>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FromKeys {
   pub modifiers: Vec<Modifier>,
   pub key: FromKey
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modifier {
   Key(KeyCode),
   Alias(String)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FromKey {
   Single(KeyCode),
   Row(String)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToKeys {
-  pub initial: Vec<InitialToKey>,
+  pub initial: Vec<Modifier>,
   pub terminal: TerminalToKey
 }
 
-#[derive(Debug, Clone)]
-pub enum InitialToKey {
-  Physical(KeyCode),
-  Alias(String)
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerminalToKey {
   Physical(KeyCode),
   Alias(String),
-  Letters(String)
+  Letters(String),
+  Null
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Repeat {
   Normal,
   Disabled,
@@ -66,10 +60,5 @@ pub enum Repeat {
     delay_ms: i32,
     interval_ms: i32
   }
-}
-
-#[derive(Debug, Clone)]
-pub struct Layout {
-  pub mappings: Vec<Mapping>
 }
 
