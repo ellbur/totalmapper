@@ -3,6 +3,7 @@
  
 mod key_codes;
 mod keys;
+mod fancy_keys;
 mod key_transforms;
 mod dev_input_rw;
 mod struct_ser;

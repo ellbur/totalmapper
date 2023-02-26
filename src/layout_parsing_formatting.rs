@@ -1,5 +1,5 @@
 
-use std::str::FromStr;
+use std::{str::FromStr, f32::consts::E};
 
 use key_codes::KeyCode;
 use serde_json::{Value, Map};
@@ -46,10 +46,14 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
   match mapping_v {
     Object(mapping_values) => {
       if has_at_least_keys(mapping_values, &vec!["from", "to"]) {
-        let from = parse_from(mapping_values.get("from").unwrap());
-        let to = parse_to(mapping_values.get("to").unwrap());
+        let from = parse_from(mapping_values.get("from").unwrap())?;
+        let to = parse_to(mapping_values.get("to").unwrap())?;
+        let repeat = parse_repeat(&mapping_values.get("repeat"))?;
+        let absorbing = parse_absorbing(&mapping_values.get("absorbing"))?;
         
-        todo!()
+        Ok(Mapping {
+          from, to, repeat, absorbing
+        })
       }
       else {
         return Err("Mapping must have \"from\" and \"to\"".to_owned())
@@ -62,38 +66,88 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
 }
 
 fn parse_from(from_v: &Value) -> Result<FromKeys, String> {
-  if let j::String(from_text) = from_v {
-    Ok(FromKeys {
-      modifiers: vec![],
-      key: parse_from_key_text(from_text)?
-    })
-  }
-  else if Object(from_obj) = from_v {
-    if has_exactly_keys(from_obj, &vec!["row"]) {
-      Ok(FromKeys {
-        modifiers: vec![],
-        key: parse_from_row(from_obj)
-      })
+  if let Array(from_elems) = from_v {
+    if from_elems.len() == 0 {
+      Err("Can't map from zero keys, i.e. []".to_owned())
     }
     else {
-      Err(format!("Don't understand `from` object with keys {}, expected possibly key `row`",
-          keys_string(from_obj)))
+      Ok(FromKeys {
+        modifiers: parse_from_modifiers(&from_elems[0..from_elems.len()-1])?,
+        key: parse_from_key(&from_elems[from_elems.len()-1])?
+      })
     }
   }
-  else if Array(from_elems) = from_v {
-    todo!()
-  }
   else {
-    todo!()
+    Ok(FromKeys {
+      modifiers: vec![],
+      key: parse_from_key(from_v)?
+    })
   }
 }
 
-fn parse_from_row(elems: Map<String, Value>) -> Result<FromKey, String> {
-  todo!()
+fn parse_from_modifiers(mod_vs: &[Value]) -> Result<Vec<Modifier>, String> {
+  let mut res = vec![];
+  
+  for v in mod_vs.iter() {
+    res.push(parse_from_modifier(v)?);
+  }
+    
+  Ok(res)
+}
+
+fn parse_from_modifier(v: &Value) -> Result<Modifier, String> {
+  if let j::String(text) = v {
+    if text.starts_with("@") {
+      Ok(Modifier::Alias(text.to_owned()))
+    }
+    else {
+      Ok(Modifier::Key(parse_key_code(text)?))
+    }
+  }
+  else {
+    Err(format!("Modifier must be a string, found {}", v))
+  }
+}
+
+fn parse_from_key(key_v: &Value) -> Result<FromKey, String> {
+  if let j::String(text) = key_v {
+    parse_from_key_text(text)
+  }
+  else if let j::Object(obj) = key_v {
+    parse_from_key_obj(obj)
+  }
+  else {
+    Err(format!("`from` key must be a string or an object, found {}", key_v))
+  }
+}
+
+fn parse_from_row(elems: &Map<String, Value>) -> Result<FromKey, String> {
+  if has_exactly_keys(elems, &vec!["row"]) {
+    let row_obj = elems.get("row").unwrap();
+    if let j::String(row_text) = row_obj {
+      Ok(FromKey::Row(row_text.clone()))
+    }
+    else {
+      Err(format!("`row` must be a string, found {}", row_obj))
+    }
+  }
+  else {
+    Err("Row must be specified by single key, `row`, which is the first key in theh row".to_owned())
+  }
 }
 
 fn parse_from_key_text(from_text: &str) -> Result<FromKey, String> {
   Ok(FromKey::Single(parse_key_code(from_text)?))
+}
+
+fn parse_from_key_obj(obj: &Map<String, Value>) -> Result<FromKey, String> {
+  if has_exactly_keys(obj, &vec!["row"]) {
+    Ok(parse_from_row(obj)?)
+  }
+  else {
+    Err(format!("Don't understand `from` object with keys {}, expected possibly key `row`",
+        keys_string(obj)))
+  }
 }
 
 fn parse_to(to_v: &Value) -> Result<ToKeys, String> {
@@ -109,75 +163,6 @@ fn parse_key_code(text: &str) -> Result<KeyCode, String> {
   }
 }
 
-fn parse_alias_definition(values: &Map<String, Value>) -> Result<Mapping, String> {
-  if !has_exactly_keys(values, &vec!["from", "to"]) {
-    return Err("Alias definition must include exactly properties \"from\" and \"to\"".to_owned());
-  }
-  
-  let from = values.get("from").unwrap();
-  let to = values.get("to").unwrap();
-  
-  Ok(Mapping::AliasDefinition(AliasDefinitionMapping {
-    from_modifiers: {
-      if let j::String(from_text) = from {
-        vec![parse_modifier(from_text)?]
-      }
-      else if let Array(from_items) = from {
-        from_items.iter().map(|item| {
-          if let j::String(text) = item {
-            parse_modifier(text)
-          }
-          else {
-            Err("Items of \"from\" in alias definition must be strings".to_owned())
-          }
-        }).collect::<Result<_, _>>()?
-      }
-      else {
-        return Err("\"from\" for an alias definition must be either a string (single key) or array (multiple keys)".to_owned())
-      }
-    },
-    to_also_keys: {
-      if let j::String(_) = to {
-        vec![]
-      }
-      else if let Array(items) = to {
-        items.iter().take(items.len()-1).map(|item| -> Result<KeyCode, String> {
-          if let j::String(text) = item {
-            KeyCode::from_str(&text).map_err(|_| format!("Unknown key code: {}", text))
-          }
-          else {
-            Err("In alias definition, \"to\" items must be strings".to_owned())
-          }
-        }).collect::<Result<Vec<KeyCode>, String>>()?
-      }
-      else {
-        return Err("\"to\" for an alias definition must be either a string or array".to_owned())
-      }
-    },
-    resulting_modifier: {
-      if let j::String(text) = to {
-        text.to_owned()
-      }
-      else if let Array(items) = to {
-        match items.last() {
-          Some(last) => {
-            if let j::String(text) = last {
-              text.to_owned()
-            }
-            else {
-              return Err("Alias definition \"to\" items must be strings".to_owned())
-            }
-          },
-          None => return Err("Alias definition must have an alias".to_owned()),
-        }
-      }
-      else {
-        return Err("Alias definition \"to\" must be string or array".to_owned())
-      }
-    }
-  }))
-}
-
 fn parse_modifier(text: &str) -> Result<Modifier, String> {
   if text.starts_with("@") {
     Ok(Modifier::Alias(text.to_owned()))
@@ -185,6 +170,14 @@ fn parse_modifier(text: &str) -> Result<Modifier, String> {
   else {
     Ok(Modifier::Key(KeyCode::from_str(&text).map_err(|_| format!("Unknown key: {}", text))?))
   }
+}
+
+fn parse_repeat(v: &Option<&Value>) -> Result<Repeat, String> {
+  todo!()
+}
+
+fn parse_absorbing(v: &Option<&Value>) -> Result<Vec<Modifier>, String> {
+  todo!()
 }
 
 fn keys_string(values: &Map<String, Value>) -> String {

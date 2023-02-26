@@ -2,7 +2,6 @@
 // vim: shiftwidth=2
  
 pub use crate::key_codes::KeyCode; 
-use std::default::Default;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Event {
@@ -21,6 +20,7 @@ pub struct Mapping {
   pub absorbing: Vec<Modifier>
 }
 
+#[derive(Debug, Clone)]
 pub struct FromKeys {
   pub modifiers: Vec<Modifier>,
   pub key: FromKey
@@ -36,13 +36,6 @@ pub enum Modifier {
 pub enum FromKey {
   Single(KeyCode),
   Row(String)
-}
-
-#[derive(Debug, Clone)]
-pub struct AliasDefinitionMapping {
-  pub from_modifiers: Vec<Modifier>,
-  pub to_also_keys: Vec<KeyCode>,
-  pub resulting_modifier: String
 }
 
 #[derive(Debug, Clone)]
