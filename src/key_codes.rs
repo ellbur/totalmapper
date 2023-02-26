@@ -1,10 +1,11 @@
 
 // vim: shiftwidth=2
 
+use serde::{Deserialize, Serialize};
 use enum_utils::FromStr;
 use num_derive::FromPrimitive;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, FromStr, FromPrimitive)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, FromStr, FromPrimitive, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 #[repr(i32)]
 pub enum KeyCode {
