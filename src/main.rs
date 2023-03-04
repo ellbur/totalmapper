@@ -12,6 +12,7 @@ mod key_transforms;
 mod dev_input_rw;
 mod struct_ser;
 mod default_layouts;
+mod default_fancy_layouts;
 mod remapping_loop;
 mod layout_generation;
 mod keyboard_listing;

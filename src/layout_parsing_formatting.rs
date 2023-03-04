@@ -408,7 +408,12 @@ fn format_from(from: &FromKeys) -> Value {
   
   elems.push(format_key(&from.key));
   
-  j::Array(elems)
+  if elems.len() == 1 {
+    elems.remove(0)
+  }
+  else {
+    j::Array(elems)
+  }
 }
 
 fn format_modifier(m: &Modifier) -> Value {
@@ -447,7 +452,12 @@ fn format_to(to: &ToKeys) -> Value {
     TerminalToKey::Letters(s) => elems.push(format_letters(&s))
   }
   
-  j::Array(elems)
+  if elems.len() == 1 {
+    elems.remove(0)
+  }
+  else {
+    j::Array(elems)
+  }
 }
 
 fn format_letters(s: &str) -> Value {
@@ -498,7 +508,7 @@ fn format_absorbing(absorbing: &Vec<Modifier>) -> Option<Value> {
 mod tests {
   use std::str::FromStr;
   use crate::fancy_keys::{Layout, Mapping, FromKeys, FromKey, Modifier, ToKeys, TerminalToKey, Repeat};
-  use super::parse_layout_from_json;
+  use super::{parse_layout_from_json, format_layout_as_json};
   use crate::key_codes::KeyCode::*;
 
   #[test]
@@ -558,6 +568,50 @@ mod tests {
         Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(COMMA) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Physical(W) }, repeat: Repeat::Special { keys: ToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: TerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: vec![] }
       ]
     });
+  }
+
+  #[test]
+  fn test_formatting_1() {
+    let text = r#"{
+  "mappings": [
+    { "from": "CAPSLOCK", "to": "@symbol" },
+    { "from": "RIGHTALT", "to": "@symbol" },
+    { "from": ["@symbol", {"row": "Q"}], "to": {"letters": " {}% \\*][|"} },
+    { "from": ["@symbol", {"row": "A"}], "to": {"letters": "   = &)(/_$"} },
+    { "from": ["@symbol", {"row": "Z"}], "to": {"letters": "\"    !+#"} }
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let restringed1 = json.to_string();
+    let layout = parse_layout_from_json(&json).unwrap();
+    let formatted = format_layout_as_json(&layout);
+    let restringed2 = formatted.to_string();
+
+    if restringed1 != restringed2 {
+      println!("{}", restringed1);
+      println!("{}", restringed2);
+    }
+    assert_eq!(restringed1, restringed2);
+  }
+
+  #[test]
+  fn test_formatting_2() {
+    let text = r#"{
+  "mappings": [
+    {"from":"COMMA", "to":"W", "repeat":{"Special":{"keys":["LEFTCTRL","F24"], "delay_ms":180, "interval_ms":30}}}
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let restringed1 = json.to_string();
+    let layout = parse_layout_from_json(&json).unwrap();
+    let formatted = format_layout_as_json(&layout);
+    let restringed2 = formatted.to_string();
+
+    if restringed1 != restringed2 {
+      println!("{}", restringed1);
+      println!("{}", restringed2);
+    }
+    assert_eq!(restringed1, restringed2);
   }
 }
 
