@@ -5,6 +5,7 @@ use serde_json::{Value, Map};
 use Value::{Object, Array};
 use crate::{fancy_keys::{Layout, Mapping, Modifier, FromKeys, FromKey, ToKeys, TerminalToKey, Repeat}, key_codes};
 use serde_json::Value as j;
+use serde_json::json;
 
 pub fn parse_layout_from_json(root: &Value) -> Result<Layout, String> {
   match root {
@@ -372,6 +373,125 @@ fn has_at_least_keys(values: &Map<String, Value>, check: &Vec<&str>) -> bool {
     }
   }
   true
+}
+
+pub fn format_layout_as_json(layout: &Layout) -> Value {
+  let mappings: Vec<Value> = layout.mappings.iter().map(format_mapping).collect();
+  
+  let mut keys = Map::new();
+  keys.insert("mappings".to_owned(), j::Array(mappings));
+  
+  j::Object(keys)
+}
+
+fn format_mapping(mapping: &Mapping) -> Value {
+  let mut keys = Map::new();
+  
+  keys.insert("from".to_owned(), format_from(&mapping.from));
+  keys.insert("to".to_owned(), format_to(&mapping.to));
+  if let Some(repeat) = format_repeat(&mapping.repeat) {
+    keys.insert("repeat".to_owned(), repeat);
+  }
+  if let Some(absorbing) = format_absorbing(&mapping.absorbing) {
+    keys.insert("absorbing".to_owned(), absorbing);
+  }
+  
+  j::Object(keys)
+}
+
+fn format_from(from: &FromKeys) -> Value {
+  let mut elems = Vec::new();
+  
+  for m in &from.modifiers {
+    elems.push(format_modifier(m));
+  }
+  
+  elems.push(format_key(&from.key));
+  
+  j::Array(elems)
+}
+
+fn format_modifier(m: &Modifier) -> Value {
+  match m {
+    Modifier::Key(k) => j::String(format!("{}", k)),
+    Modifier::Alias(a) => j::String(a.clone())
+  }
+}
+
+fn format_key(k: &FromKey) -> Value {
+  match k {
+    FromKey::Single(k) => j::String(format!("{}", k)),
+    FromKey::Row(row) => format_row(row)
+  }
+}
+
+fn format_row(row: &str) -> Value {
+  let mut keys = Map::new();
+
+  keys.insert("row".to_owned(), j::String(row.to_owned()));
+  
+  j::Object(keys)
+}
+
+fn format_to(to: &ToKeys) -> Value {
+  let mut elems = Vec::new();
+  
+  for m in &to.initial {
+    elems.push(format_modifier(m));
+  }
+  
+  match &to.terminal {
+    TerminalToKey::Null => elems.clear(),
+    TerminalToKey::Physical(k) => elems.push(j::String(format!("{}", k))),
+    TerminalToKey::Alias(s) => elems.push(j::String(s.clone())),
+    TerminalToKey::Letters(s) => elems.push(format_letters(&s))
+  }
+  
+  j::Array(elems)
+}
+
+fn format_letters(s: &str) -> Value {
+  let mut keys = Map::new();
+  
+  keys.insert("letters".to_owned(), j::String(s.to_owned()));
+  
+  j::Object(keys)
+}
+
+fn format_repeat(repeat: &Repeat) -> Option<Value> {
+  match repeat {
+    Repeat::Normal => None,
+    Repeat::Disabled => Some(j::String("Disabled".to_owned())),
+    Repeat::Special { keys, delay_ms, interval_ms } => Some(format_repeat_special(keys, *delay_ms, *interval_ms))
+  }
+}
+
+fn format_repeat_special(keys: &ToKeys, delay_ms: i32, interval_ms: i32) -> Value {
+  let mut elems1 = Map::new();
+  let mut elems2 = Map::new();
+  
+  elems2.insert("keys".to_owned(), format_to(keys));
+  elems2.insert("delay_ms".to_owned(), json!(delay_ms));
+  elems2.insert("interval_ms".to_owned(), json!(interval_ms));
+  
+  elems1.insert("Special".to_owned(), j::Object(elems2));
+  
+  j::Object(elems1)
+}
+
+fn format_absorbing(absorbing: &Vec<Modifier>) -> Option<Value> {
+  if absorbing.is_empty() {
+    None
+  }
+  else {
+    let mut res = Vec::new();
+    
+    for m in absorbing {
+      res.push(format_modifier(m));
+    }
+    
+    Some(j::Array(res))
+  }
 }
 
 #[cfg(test)]

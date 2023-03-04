@@ -1,6 +1,9 @@
  
 // vim: shiftwidth=2
  
+#[macro_use]
+extern crate enum_display_derive;
+
 mod key_codes;
 mod events;
 mod keys;
