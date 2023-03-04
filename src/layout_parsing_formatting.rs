@@ -500,7 +500,12 @@ fn format_absorbing(absorbing: &Vec<Modifier>) -> Option<Value> {
       res.push(format_modifier(m));
     }
     
-    Some(j::Array(res))
+    if res.len() == 1 {
+      Some(res.remove(0))
+    }
+    else {
+      Some(j::Array(res))
+    }
   }
 }
 
