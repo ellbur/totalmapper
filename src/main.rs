@@ -8,6 +8,7 @@ mod key_codes;
 mod events;
 mod keys;
 mod fancy_keys;
+mod fancy_layout_interpreting;
 mod key_transforms;
 mod dev_input_rw;
 mod struct_ser;

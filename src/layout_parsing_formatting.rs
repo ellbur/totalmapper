@@ -3,9 +3,11 @@ use std::str::FromStr;
 use key_codes::KeyCode;
 use serde_json::{Value, Map};
 use Value::{Object, Array};
-use crate::{fancy_keys::{Layout, Mapping, Modifier, FromKeys, FromKey, ToKeys, TerminalToKey, Repeat}, key_codes};
+use crate::{fancy_keys::{Layout, Mapping, SingleMapping, RowMapping, Modifier, SingleFromKeys, RowFromKeys, SingleToKeys, RowToKeys, SingleTerminalToKey, SingleRepeat, RowRepeat, RowTerminalToKey, Row}, key_codes};
 use serde_json::Value as j;
 use serde_json::json;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 pub fn parse_layout_from_json(root: &Value) -> Result<Layout, String> {
   match root {
@@ -47,13 +49,26 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
     Object(mapping_values) => {
       if has_at_least_keys(mapping_values, &vec!["from", "to"]) {
         let from = parse_from(mapping_values.get("from").unwrap())?;
-        let to = parse_to(mapping_values.get("to").unwrap())?;
-        let repeat = parse_repeat(&mapping_values.get("repeat"))?;
-        let absorbing = parse_absorbing(&mapping_values.get("absorbing"))?;
-        
-        Ok(Mapping {
-          from, to, repeat, absorbing
-        })
+        match from {
+          FromKeys::Single(from) => {
+            let to = parse_single_to(mapping_values.get("to").unwrap())?;
+            let repeat = parse_single_repeat(&mapping_values.get("repeat"))?;
+            let absorbing = parse_absorbing(&mapping_values.get("absorbing"))?;
+
+            Ok(Mapping::Single(SingleMapping {
+              from, to, repeat, absorbing
+            }))
+          },
+          FromKeys::Row(from) => {
+            let to = parse_row_to(mapping_values.get("to").unwrap())?;
+            let repeat = parse_row_repeat(&mapping_values.get("repeat"))?;
+            let absorbing = parse_absorbing(&mapping_values.get("absorbing"))?;
+
+            Ok(Mapping::Row(RowMapping {
+              from, to, repeat, absorbing
+            }))
+          }
+        }
       }
       else {
         return Err("Mapping must have \"from\" and \"to\"".to_owned())
@@ -65,23 +80,31 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
   }
 }
 
+enum FromKeys {
+  Single(SingleFromKeys),
+  Row(RowFromKeys)
+}
+
 fn parse_from(from_v: &Value) -> Result<FromKeys, String> {
   if let Array(from_elems) = from_v {
     if from_elems.len() == 0 {
       Err("Can't map from zero keys, i.e. []".to_owned())
     }
     else {
-      Ok(FromKeys {
-        modifiers: parse_from_modifiers(&from_elems[0..from_elems.len()-1])?,
-        key: parse_from_key(&from_elems[from_elems.len()-1])?
-      })
+      let modifiers = parse_from_modifiers(&from_elems[0..from_elems.len()-1])?;
+      let key = parse_from_key(&from_elems[from_elems.len()-1])?;
+      match key {
+        FromKey::Single(key) => Ok(FromKeys::Single(SingleFromKeys { modifiers, key })),
+        FromKey::Row(row) => Ok(FromKeys::Row(RowFromKeys { modifiers, row }))
+      }
     }
   }
   else {
-    Ok(FromKeys {
-      modifiers: vec![],
-      key: parse_from_key(from_v)?
-    })
+    let key = parse_from_key(from_v)?;
+    match key {
+      FromKey::Single(key) => Ok(FromKeys::Single(SingleFromKeys { modifiers: vec![], key })),
+      FromKey::Row(row) => Ok(FromKeys::Row(RowFromKeys { modifiers: vec![], row }))
+    }
   }
 }
 
@@ -109,6 +132,11 @@ fn parse_from_modifier(v: &Value) -> Result<Modifier, String> {
   }
 }
 
+enum FromKey {
+  Single(KeyCode),
+  Row(Row)
+}
+
 fn parse_from_key(key_v: &Value) -> Result<FromKey, String> {
   if let j::String(text) = key_v {
     parse_from_key_text(text)
@@ -125,7 +153,7 @@ fn parse_from_row(elems: &Map<String, Value>) -> Result<FromKey, String> {
   if has_exactly_keys(elems, &vec!["row"]) {
     let row_obj = elems.get("row").unwrap();
     if let j::String(row_text) = row_obj {
-      Ok(FromKey::Row(row_text.clone()))
+      Ok(FromKey::Row(parse_row(row_text)?))
     }
     else {
       Err(format!("`row` must be a string, found {}", row_obj))
@@ -133,6 +161,30 @@ fn parse_from_row(elems: &Map<String, Value>) -> Result<FromKey, String> {
   }
   else {
     Err("Row must be specified by single key, `row`, which is the first key in theh row".to_owned())
+  }
+}
+
+lazy_static! {
+  static ref ROW_NAMES: HashMap<String, Row> = {
+    use crate::fancy_keys::Row::*;
+    vec![
+     ("`".to_string(), USQuertyGrave),
+     ("1".to_string(), USQuerty1),
+     ("Q".to_string(), USQuertyQ),
+     ("A".to_string(), USQuertyA),
+     ("Z".to_string(), USQuertyZ),
+    ].into_iter().collect()
+  };
+}
+
+fn parse_row(text: &str) -> Result<Row, String> {
+  match ROW_NAMES.get(&text.to_uppercase()) {
+    None => {
+      let expected: Vec<String> = ROW_NAMES.keys().map(|s| s.to_owned()).collect();
+      let expected = expected.join(", ");
+      Err(format!("Don't know row {}, expected one of {}", text, expected))
+    },
+    Some(row) => Ok(row.clone())
   }
 }
 
@@ -150,51 +202,86 @@ fn parse_from_key_obj(obj: &Map<String, Value>) -> Result<FromKey, String> {
   }
 }
 
-fn parse_to(to_v: &Value) -> Result<ToKeys, String> {
+fn parse_single_to(to_v: &Value) -> Result<SingleToKeys, String> {
   if let j::Array(to_elems) = to_v {
-    parse_to_array(to_elems)
+    parse_single_to_array(to_elems)
   }
   else {
-    Ok(ToKeys {
+    Ok(SingleToKeys {
       initial: vec![],
-      terminal: parse_to_terminal(to_v)?
+      terminal: parse_single_to_terminal(to_v)?
     })
   }
 }
 
-fn parse_to_terminal(to_v: &Value) -> Result<TerminalToKey, String> {
+fn parse_row_to(to_v: &Value) -> Result<RowToKeys, String> {
+  if let j::Array(to_elems) = to_v {
+    parse_row_to_array(to_elems)
+  }
+  else {
+    Ok(RowToKeys {
+      initial: vec![],
+      terminal: parse_row_to_terminal(to_v)?
+    })
+  }
+}
+
+fn parse_single_to_terminal(to_v: &Value) -> Result<SingleTerminalToKey, String> {
   if let j::String(to_text) = to_v {
-    parse_to_text(to_text)
+    parse_single_to_text(to_text)
   }
   else if let j::Object(to_attrs) = to_v {
-    parse_to_obj(to_attrs)
+    parse_single_to_obj(to_attrs)
   }
   else {
     Err(format!("`to` should be a string, array, or object; found {}", to_v))
   }
-  
 }
 
-fn parse_to_text(to_text: &str) -> Result<TerminalToKey, String> {
-  if to_text.starts_with("@") {
-    Ok(TerminalToKey::Alias(to_text.to_owned()))
+fn parse_row_to_terminal(to_v: &Value) -> Result<RowTerminalToKey, String> {
+  if let j::Object(to_attrs) = to_v {
+    parse_row_to_obj(to_attrs)
   }
   else {
-    Ok(TerminalToKey::Physical(KeyCode::from_str(&to_text).map_err(|_| format!("Unknown key code: {}", to_text))?))
+    Err(format!("`to` should be object with key `letters`; found {}", to_v))
   }
 }
 
-fn parse_to_array(to_elems: &[Value]) -> Result<ToKeys, String> {
+fn parse_single_to_text(to_text: &str) -> Result<SingleTerminalToKey, String> {
+  if to_text.starts_with("@") {
+    Ok(SingleTerminalToKey::Alias(to_text.to_owned()))
+  }
+  else {
+    Ok(SingleTerminalToKey::Physical(KeyCode::from_str(&to_text).map_err(|_| format!("Unknown key code: {}", to_text))?))
+  }
+}
+
+fn parse_single_to_array(to_elems: &[Value]) -> Result<SingleToKeys, String> {
   if to_elems.len() == 0 {
-    Ok(ToKeys {
+    Ok(SingleToKeys {
       initial: vec![],
-      terminal: TerminalToKey::Null
+      terminal: SingleTerminalToKey::Null
     })
   }
   else {
-    Ok(ToKeys {
+    Ok(SingleToKeys {
       initial: parse_to_initial(&to_elems[0..to_elems.len()-1])?,
-      terminal: parse_to_terminal(&to_elems[to_elems.len()-1])?
+      terminal: parse_single_to_terminal(&to_elems[to_elems.len()-1])?
+    })
+  }
+}
+
+fn parse_row_to_array(to_elems: &[Value]) -> Result<RowToKeys, String> {
+  if to_elems.len() == 0 {
+    Ok(RowToKeys {
+      initial: vec![],
+      terminal: RowTerminalToKey::Null
+    })
+  }
+  else {
+    Ok(RowToKeys {
+      initial: parse_to_initial(&to_elems[0..to_elems.len()-1])?,
+      terminal: parse_row_to_terminal(&to_elems[to_elems.len()-1])?
     })
   }
 }
@@ -223,11 +310,20 @@ fn parse_to_initial_elem(elem: &Value) -> Result<Modifier, String> {
   }
 }
 
-fn parse_to_obj(to_attrs: &Map<String, Value>) -> Result<TerminalToKey, String> {
+fn parse_single_to_obj(to_attrs: &Map<String, Value>) -> Result<SingleTerminalToKey, String> {
+  if has_exactly_keys(to_attrs, &vec!["letters"]) {
+    Err("Cannot map a single key to a row of letters".to_owned())
+  }
+  else {
+    Err(format!("`to` object of unrecognized form {}", j::Object(to_attrs.clone())))
+  }
+}
+
+fn parse_row_to_obj(to_attrs: &Map<String, Value>) -> Result<RowTerminalToKey, String> {
   if has_exactly_keys(to_attrs, &vec!["letters"]) {
     let letters = to_attrs.get("letters").unwrap();
     if let j::String(letters_text) = letters {
-      Ok(TerminalToKey::Letters(letters_text.to_owned()))
+      Ok(RowTerminalToKey::Letters(letters_text.to_owned()))
     }
     else {
       Err(format!("`letters` must be a string, found {}", letters))
@@ -256,14 +352,14 @@ fn parse_modifier(text: &str) -> Result<Modifier, String> {
   }
 }
 
-fn parse_repeat(v: &Option<&Value>) -> Result<Repeat, String> {
+fn parse_single_repeat(v: &Option<&Value>) -> Result<SingleRepeat, String> {
   if let Some(v) = v {
     if let j::String(text) = v {
       if text.to_lowercase() == "normal" {
-        Ok(Repeat::Normal)
+        Ok(SingleRepeat::Normal)
       }
       else if text.to_lowercase() == "disabled" {
-        Ok(Repeat::Disabled)
+        Ok(SingleRepeat::Disabled)
       }
       else {
         Err(format!("Unrecognized repeat style: {}", text))
@@ -278,8 +374,8 @@ fn parse_repeat(v: &Option<&Value>) -> Result<Repeat, String> {
             let delay_ms = special.get("delay_ms").unwrap();
             let interval_ms = special.get("interval_ms").unwrap();
             
-            Ok(Repeat::Special {
-              keys: parse_repeat_keys(keys)?,
+            Ok(SingleRepeat::Special {
+              keys: parse_single_repeat_keys(keys)?,
               delay_ms: parse_repeat_delay_ms(delay_ms)?,
               interval_ms: parse_repeat_interval_ms(interval_ms)?
             })
@@ -301,12 +397,65 @@ fn parse_repeat(v: &Option<&Value>) -> Result<Repeat, String> {
     }
   }
   else {
-    Ok(Repeat::Normal)
+    Ok(SingleRepeat::Normal)
   }
 }
 
-fn parse_repeat_keys(v: &Value) -> Result<ToKeys, String> {
-  parse_to(v)
+fn parse_row_repeat(v: &Option<&Value>) -> Result<RowRepeat, String> {
+  if let Some(v) = v {
+    if let j::String(text) = v {
+      if text.to_lowercase() == "normal" {
+        Ok(RowRepeat::Normal)
+      }
+      else if text.to_lowercase() == "disabled" {
+        Ok(RowRepeat::Disabled)
+      }
+      else {
+        Err(format!("Unrecognized repeat style: {}", text))
+      }
+    }
+    else if let j::Object(params) = v {
+      if has_exactly_keys(params, &vec!["Special"]) {
+        let special = params.get("Special").unwrap();
+        if let j::Object(special) = special {
+          if has_exactly_keys(special, &vec!["keys", "delay_ms", "interval_ms"]) {
+            let keys = special.get("keys").unwrap();
+            let delay_ms = special.get("delay_ms").unwrap();
+            let interval_ms = special.get("interval_ms").unwrap();
+            
+            Ok(RowRepeat::Special {
+              keys: parse_row_repeat_keys(keys)?,
+              delay_ms: parse_repeat_delay_ms(delay_ms)?,
+              interval_ms: parse_repeat_interval_ms(interval_ms)?
+            })
+          }
+          else {
+            Err(format!("`Special` repeat must have attributes `keys`, `delay_ms`, and `interval_ms`, found {}", keys_string(special)))
+          }
+        }
+        else {
+          Err(format!("`Special` repeat must be an object, found {}", special))
+        }
+      }
+      else {
+        Err(format!("Unknown repeat style: {}", v))
+      }
+    }
+    else {
+      Err(format!("Unknown repeat style: {}", v))
+    }
+  }
+  else {
+    Ok(RowRepeat::Normal)
+  }
+}
+
+fn parse_single_repeat_keys(v: &Value) -> Result<SingleToKeys, String> {
+  parse_single_to(v)
+}
+
+fn parse_row_repeat_keys(v: &Value) -> Result<RowToKeys, String> {
+  parse_row_to(v)
 }
 
 fn parse_repeat_delay_ms(v: &Value) -> Result<i32, String> {
@@ -385,11 +534,18 @@ pub fn format_layout_as_json(layout: &Layout) -> Value {
 }
 
 fn format_mapping(mapping: &Mapping) -> Value {
+  match mapping {
+    Mapping::Single(single) => format_single_mapping(single),
+    Mapping::Row(row) => format_row_mapping(row)
+  }
+}
+
+fn format_single_mapping(mapping: &SingleMapping) -> Value {
   let mut keys = Map::new();
   
-  keys.insert("from".to_owned(), format_from(&mapping.from));
-  keys.insert("to".to_owned(), format_to(&mapping.to));
-  if let Some(repeat) = format_repeat(&mapping.repeat) {
+  keys.insert("from".to_owned(), format_single_from(&mapping.from));
+  keys.insert("to".to_owned(), format_single_to(&mapping.to));
+  if let Some(repeat) = format_single_repeat(&mapping.repeat) {
     keys.insert("repeat".to_owned(), repeat);
   }
   if let Some(absorbing) = format_absorbing(&mapping.absorbing) {
@@ -399,14 +555,46 @@ fn format_mapping(mapping: &Mapping) -> Value {
   j::Object(keys)
 }
 
-fn format_from(from: &FromKeys) -> Value {
+fn format_row_mapping(mapping: &RowMapping) -> Value {
+  let mut keys = Map::new();
+  
+  keys.insert("from".to_owned(), format_row_from(&mapping.from));
+  keys.insert("to".to_owned(), format_row_to(&mapping.to));
+  if let Some(repeat) = format_row_repeat(&mapping.repeat) {
+    keys.insert("repeat".to_owned(), repeat);
+  }
+  if let Some(absorbing) = format_absorbing(&mapping.absorbing) {
+    keys.insert("absorbing".to_owned(), absorbing);
+  }
+  
+  j::Object(keys)
+}
+
+fn format_single_from(from: &SingleFromKeys) -> Value {
   let mut elems = Vec::new();
   
   for m in &from.modifiers {
     elems.push(format_modifier(m));
   }
   
-  elems.push(format_key(&from.key));
+  elems.push(j::String(format!("{}", from.key)));
+  
+  if elems.len() == 1 {
+    elems.remove(0)
+  }
+  else {
+    j::Array(elems)
+  }
+}
+
+fn format_row_from(from: &RowFromKeys) -> Value {
+  let mut elems = Vec::new();
+  
+  for m in &from.modifiers {
+    elems.push(format_modifier(m));
+  }
+  
+  elems.push(format_row(&from.row));
   
   if elems.len() == 1 {
     elems.remove(0)
@@ -430,15 +618,22 @@ fn format_key(k: &FromKey) -> Value {
   }
 }
 
-fn format_row(row: &str) -> Value {
+fn format_row(row: &Row) -> Value {
   let mut keys = Map::new();
+  use crate::fancy_keys::Row::*;
 
-  keys.insert("row".to_owned(), j::String(row.to_owned()));
+  keys.insert("row".to_owned(), j::String(match row {
+    USQuertyGrave => "`".to_owned(),
+    USQuerty1 => "1".to_owned(),
+    USQuertyQ => "Q".to_owned(),
+    USQuertyA => "A".to_owned(),
+    USQuertyZ => "Z".to_owned()
+  }));
   
   j::Object(keys)
 }
 
-fn format_to(to: &ToKeys) -> Value {
+fn format_single_to(to: &SingleToKeys) -> Value {
   let mut elems = Vec::new();
   
   for m in &to.initial {
@@ -446,10 +641,29 @@ fn format_to(to: &ToKeys) -> Value {
   }
   
   match &to.terminal {
-    TerminalToKey::Null => elems.clear(),
-    TerminalToKey::Physical(k) => elems.push(j::String(format!("{}", k))),
-    TerminalToKey::Alias(s) => elems.push(j::String(s.clone())),
-    TerminalToKey::Letters(s) => elems.push(format_letters(&s))
+    SingleTerminalToKey::Null => elems.clear(),
+    SingleTerminalToKey::Physical(k) => elems.push(j::String(format!("{}", k))),
+    SingleTerminalToKey::Alias(s) => elems.push(j::String(s.clone()))
+  }
+  
+  if elems.len() == 1 {
+    elems.remove(0)
+  }
+  else {
+    j::Array(elems)
+  }
+}
+
+fn format_row_to(to: &RowToKeys) -> Value {
+  let mut elems = Vec::new();
+  
+  for m in &to.initial {
+    elems.push(format_modifier(m));
+  }
+  
+  match &to.terminal {
+    RowTerminalToKey::Null => elems.clear(),
+    RowTerminalToKey::Letters(letters) => elems.push(format_letters(letters))
   }
   
   if elems.len() == 1 {
@@ -468,19 +682,40 @@ fn format_letters(s: &str) -> Value {
   j::Object(keys)
 }
 
-fn format_repeat(repeat: &Repeat) -> Option<Value> {
+fn format_single_repeat(repeat: &SingleRepeat) -> Option<Value> {
   match repeat {
-    Repeat::Normal => None,
-    Repeat::Disabled => Some(j::String("Disabled".to_owned())),
-    Repeat::Special { keys, delay_ms, interval_ms } => Some(format_repeat_special(keys, *delay_ms, *interval_ms))
+    SingleRepeat::Normal => None,
+    SingleRepeat::Disabled => Some(j::String("Disabled".to_owned())),
+    SingleRepeat::Special { keys, delay_ms, interval_ms } => Some(format_single_repeat_special(keys, *delay_ms, *interval_ms))
   }
 }
 
-fn format_repeat_special(keys: &ToKeys, delay_ms: i32, interval_ms: i32) -> Value {
+fn format_row_repeat(repeat: &RowRepeat) -> Option<Value> {
+  match repeat {
+    RowRepeat::Normal => None,
+    RowRepeat::Disabled => Some(j::String("Disabled".to_owned())),
+    RowRepeat::Special { keys, delay_ms, interval_ms } => Some(format_row_repeat_special(keys, *delay_ms, *interval_ms))
+  }
+}
+
+fn format_single_repeat_special(keys: &SingleToKeys, delay_ms: i32, interval_ms: i32) -> Value {
   let mut elems1 = Map::new();
   let mut elems2 = Map::new();
   
-  elems2.insert("keys".to_owned(), format_to(keys));
+  elems2.insert("keys".to_owned(), format_single_to(keys));
+  elems2.insert("delay_ms".to_owned(), json!(delay_ms));
+  elems2.insert("interval_ms".to_owned(), json!(interval_ms));
+  
+  elems1.insert("Special".to_owned(), j::Object(elems2));
+  
+  j::Object(elems1)
+}
+
+fn format_row_repeat_special(keys: &RowToKeys, delay_ms: i32, interval_ms: i32) -> Value {
+  let mut elems1 = Map::new();
+  let mut elems2 = Map::new();
+  
+  elems2.insert("keys".to_owned(), format_row_to(keys));
   elems2.insert("delay_ms".to_owned(), json!(delay_ms));
   elems2.insert("interval_ms".to_owned(), json!(interval_ms));
   
@@ -512,7 +747,7 @@ fn format_absorbing(absorbing: &Vec<Modifier>) -> Option<Value> {
 #[cfg(test)]
 mod tests {
   use std::str::FromStr;
-  use crate::fancy_keys::{Layout, Mapping, FromKeys, FromKey, Modifier, ToKeys, TerminalToKey, Repeat};
+  use crate::fancy_keys::{Layout, Mapping, SingleMapping, RowMapping, SingleFromKeys, RowFromKeys, Modifier, SingleToKeys, RowToKeys, SingleTerminalToKey, RowTerminalToKey, SingleRepeat, RowRepeat};
   use super::{parse_layout_from_json, format_layout_as_json};
   use crate::key_codes::KeyCode::*;
 
@@ -528,8 +763,8 @@ mod tests {
     let parsed = parse_layout_from_json(&json).unwrap();
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(CAPSLOCK) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
-        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(RIGHTALT) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] }
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: CAPSLOCK }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Alias("@symbol".to_owned()) }, repeat: SingleRepeat::Normal, absorbing: vec![] }),
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: RIGHTALT }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Alias("@symbol".to_owned()) }, repeat: SingleRepeat::Normal, absorbing: vec![] })
       ]
     });
   }
@@ -547,14 +782,15 @@ mod tests {
 }"#;
     let json = serde_json::Value::from_str(text).unwrap();
     let parsed = parse_layout_from_json(&json).unwrap();
+    use crate::fancy_keys::Row::*;
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(CAPSLOCK) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
-        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(RIGHTALT) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Alias("@symbol".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: CAPSLOCK }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Alias("@symbol".to_owned()) }, repeat: SingleRepeat::Normal, absorbing: vec![] }),
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: RIGHTALT }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Alias("@symbol".to_owned()) }, repeat: SingleRepeat::Normal, absorbing: vec![] }),
       
-        Mapping { from: FromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], key: FromKey::Row("Q".to_owned()) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Letters(" {}% \\*][|".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
-        Mapping { from: FromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], key: FromKey::Row("A".to_owned()) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Letters("   = &)(/_$".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
-        Mapping { from: FromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], key: FromKey::Row("Z".to_owned()) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Letters("\"    !+#".to_owned()) }, repeat: Repeat::Normal, absorbing: vec![] },
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyQ }, to: RowToKeys { initial: vec![], terminal: RowTerminalToKey::Letters(" {}% \\*][|".to_owned()) }, repeat: RowRepeat::Normal, absorbing: vec![] }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyA }, to: RowToKeys { initial: vec![], terminal: RowTerminalToKey::Letters("   = &)(/_$".to_owned()) }, repeat: RowRepeat::Normal, absorbing: vec![] }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyZ }, to: RowToKeys { initial: vec![], terminal: RowTerminalToKey::Letters("\"    !+#".to_owned()) }, repeat: RowRepeat::Normal, absorbing: vec![] }),
       ]
     });
   }
@@ -570,7 +806,7 @@ mod tests {
     let parsed = parse_layout_from_json(&json).unwrap();
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping { from: FromKeys { modifiers: vec![], key: FromKey::Single(COMMA) }, to: ToKeys { initial: vec![], terminal: TerminalToKey::Physical(W) }, repeat: Repeat::Special { keys: ToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: TerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: vec![] }
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: COMMA }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(W) }, repeat: SingleRepeat::Special { keys: SingleToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: SingleTerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: vec![] })
       ]
     });
   }

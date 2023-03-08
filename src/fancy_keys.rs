@@ -12,17 +12,46 @@ pub struct Layout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Mapping {
-  pub from: FromKeys,
-  pub to: ToKeys,
-  pub repeat: Repeat,
+pub enum Mapping {
+  Single(SingleMapping),
+  Row(RowMapping)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SingleMapping {
+  pub from: SingleFromKeys,
+  pub to: SingleToKeys,
+  pub repeat: SingleRepeat,
   pub absorbing: Vec<Modifier>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FromKeys {
+pub struct RowMapping {
+  pub from: RowFromKeys,
+  pub to: RowToKeys,
+  pub repeat: RowRepeat,
+  pub absorbing: Vec<Modifier>
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SingleFromKeys {
   pub modifiers: Vec<Modifier>,
-  pub key: FromKey
+  pub key: KeyCode
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowFromKeys {
+  pub modifiers: Vec<Modifier>,
+  pub row: Row
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Row {
+  USQuertyGrave,
+  USQuerty1,
+  USQuertyQ,
+  USQuertyA,
+  USQuertyZ,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,31 +61,47 @@ pub enum Modifier {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FromKey {
-  Single(KeyCode),
-  Row(String)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToKeys {
+pub struct SingleToKeys {
   pub initial: Vec<Modifier>,
-  pub terminal: TerminalToKey
+  pub terminal: SingleTerminalToKey
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TerminalToKey {
+pub struct RowToKeys {
+  pub initial: Vec<Modifier>,
+  pub terminal: RowTerminalToKey
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SingleTerminalToKey {
   Physical(KeyCode),
   Alias(String),
+  Null
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RowTerminalToKey {
   Letters(String),
   Null
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Repeat {
+pub enum SingleRepeat {
   Normal,
   Disabled,
   Special {
-    keys: ToKeys,
+    keys: SingleToKeys,
+    delay_ms: i32,
+    interval_ms: i32
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RowRepeat {
+  Normal,
+  Disabled,
+  Special {
+    keys: RowToKeys,
     delay_ms: i32,
     interval_ms: i32
   }

@@ -1,4 +1,19 @@
 
+use std::collections::HashMap;
+use lazy_static::lazy_static;
+
+lazy_static! {
+  pub static ref DEFAULT_LAYOUTS: HashMap<String, &'static str> = {
+    vec![
+     ("caps-for-movement".to_string(), &*CAPS_LOCK_FOR_MOVEMENT),
+     ("easy-symbols".to_string(), &*EASY_SYMBOLS),
+     ("caps-q-for-esc".to_string(), &*CAPS_Q_FOR_ESC),
+     ("easy-symbols-tab-for-movement".to_string(), &*EASY_SYMBOLS_TAB_FOR_MOVEMENT),
+     ("super-dvorak".to_string(), &*SUPER_DVORAK),
+    ].into_iter().collect()
+  };
+}
+
 pub static CAPS_LOCK_FOR_MOVEMENT: &'static str = r#"{
   "mappings": [
     { "from": "CAPSLOCK", "to": [] },
