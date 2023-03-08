@@ -14,7 +14,14 @@ pub struct Layout {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mapping {
   Single(SingleMapping),
+  Alias(AliasMapping),
   Row(RowMapping)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasMapping {
+  pub from: AliasFromKeys,
+  pub to: AliasToKeys
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +44,11 @@ pub struct RowMapping {
 pub struct SingleFromKeys {
   pub modifiers: Vec<Modifier>,
   pub key: KeyCode
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasFromKeys {
+  pub keys: Vec<KeyCode>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +79,12 @@ pub struct SingleToKeys {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasToKeys {
+  pub initial: Vec<Modifier>,
+  pub terminal: String
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowToKeys {
   pub initial: Vec<Modifier>,
   pub terminal: RowTerminalToKey
@@ -75,7 +93,6 @@ pub struct RowToKeys {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SingleTerminalToKey {
   Physical(KeyCode),
-  Alias(String),
   Null
 }
 
