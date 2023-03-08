@@ -80,7 +80,7 @@ pub struct SingleToKeys {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AliasToKeys {
-  pub initial: Vec<Modifier>,
+  pub initial: Vec<KeyCode>,
   pub terminal: String
 }
 

@@ -337,11 +337,16 @@ fn parse_single_or_alias_to_array(to_elems: &[Value]) -> Result<SingleOrAliasToK
   }
   else {
     let terminal = parse_single_or_alias_to_terminal(&to_elems[to_elems.len()-1])?;
-    let initial = parse_to_initial(&to_elems[0..to_elems.len()-1])?;
     
     match terminal {
-      SingleOrAliasToTerminal::Single(terminal) => Ok(SingleOrAliasToKeys::Single(SingleToKeys { initial, terminal })),
-      SingleOrAliasToTerminal::Alias(terminal) => Ok(SingleOrAliasToKeys::Alias(AliasToKeys { initial, terminal })),
+      SingleOrAliasToTerminal::Single(terminal) => Ok(SingleOrAliasToKeys::Single(SingleToKeys {
+        initial: parse_to_initial(&to_elems[0..to_elems.len()-1])?,
+        terminal
+      })),
+      SingleOrAliasToTerminal::Alias(terminal) => Ok(SingleOrAliasToKeys::Alias(AliasToKeys {
+        initial: parse_alias_to_initial(&to_elems[0..to_elems.len()-1])?,
+        terminal
+      })),
     }
   }
 }
@@ -386,6 +391,16 @@ fn parse_to_initial(initial_elems: &[Value]) -> Result<Vec<Modifier>, String> {
   Ok(res)
 }
 
+fn parse_alias_to_initial(initial_elems: &[Value]) -> Result<Vec<KeyCode>, String> {
+  let mut res = vec![];
+  
+  for elem in initial_elems {
+    res.push(parse_key_code_j(elem)?);
+  }
+  
+  Ok(res)
+}
+
 fn parse_to_initial_elem(elem: &Value) -> Result<Modifier, String> {
   if let j::String(text) = elem {
     if text.starts_with("@") {
@@ -412,6 +427,15 @@ fn parse_row_to_obj(to_attrs: &Map<String, Value>) -> Result<RowTerminalToKey, S
   }
   else {
     Err(format!("`to` object of unrecognized form {}, expected, for example, `letters`", j::Object(to_attrs.clone())))
+  }
+}
+
+fn parse_key_code_j(v: &Value) -> Result<KeyCode, String> {
+  if let j::String(text) = v {
+    parse_key_code(text)
+  }
+  else {
+    Err(format!("A string (keycode) was expected, but found {}", v))
   }
 }
 
@@ -710,6 +734,10 @@ fn format_row_from(from: &RowFromKeys) -> Value {
   }
 }
 
+fn format_key_code(k: &KeyCode) -> Value {
+  j::String(format!("{}", k))
+}
+
 fn format_modifier(m: &Modifier) -> Value {
   match m {
     Modifier::Key(k) => j::String(format!("{}", k)),
@@ -743,7 +771,7 @@ fn format_alias_to(to: &AliasToKeys) -> Value {
   let mut elems = Vec::new();
   
   for m in &to.initial {
-    elems.push(format_modifier(m));
+    elems.push(format_key_code(m));
   }
   
   elems.push(j::String(to.terminal.clone()));
