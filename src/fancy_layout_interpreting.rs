@@ -637,5 +637,22 @@ use super::{multiply, convert_row_to, convert};
     assert_eq!(simple_layout.mappings[0], SM { from: vec![LS, A], to: vec![LS, S], repeat: s::Repeat::Special {
       keys: vec![F24], delay_ms: 180, interval_ms: 30 }, absorbing: vec![] });
   }
+
+  #[test]
+  fn test_caps_q_escape() {
+    let layout_json = r#"{
+  "mappings": [
+    { "from": "CAPSLOCK", "to": [] },
+    { "from": ["CAPSLOCK", "Q"], "to": "ESC" }
+  ]
+}"#;
+    let layout_v = serde_json::from_str(layout_json).unwrap();
+    let fancy_layout = crate::layout_parsing_formatting::parse_layout_from_json(&layout_v).unwrap();
+    let simple_layout = convert(&fancy_layout).unwrap();
+    assert_eq!(simple_layout.mappings.len(), 2);
+    use s::Mapping as SM;
+    assert_eq!(simple_layout.mappings[0], SM { from: vec![CAPSLOCK], to: vec![], repeat: s::Repeat::Normal, absorbing: vec![] });
+    assert_eq!(simple_layout.mappings[1], SM { from: vec![CAPSLOCK, Q], to: vec![ESC], repeat: s::Repeat::Normal, absorbing: vec![] });
+  }
 }
 
