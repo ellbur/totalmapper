@@ -174,7 +174,7 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
             let repeat = parse_single_repeat(&mapping_values.get("repeat"))?;
             Ok(Mapping::RepeatOnlySingle(RepeatOnlySingleMapping { from, repeat }))
           },
-          FromKeys::Row(from) => {
+          FromKeys::Row(_) => {
             Err("Cannot have a repeat-only row mapping".to_owned())
           }
         }
@@ -726,6 +726,7 @@ fn has_at_least_keys(values: &Map<String, Value>, check: &Vec<&str>) -> bool {
   true
 }
 
+#[cfg(test)]
 pub fn format_layout_as_json(layout: &Layout) -> Value {
   let mappings: Vec<Value> = layout.mappings.iter().map(format_mapping).collect();
   
@@ -851,13 +852,6 @@ fn format_modifier(m: &Modifier) -> Value {
   match m {
     Modifier::Key(k) => j::String(format!("{}", k)),
     Modifier::Alias(a) => j::String(a.clone())
-  }
-}
-
-fn format_key(k: &FromKey) -> Value {
-  match k {
-    FromKey::Single(k) => j::String(format!("{}", k)),
-    FromKey::Row(row) => format_row(row)
   }
 }
 

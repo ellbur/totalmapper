@@ -433,7 +433,7 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   state.mapped_absorbed_keys.retain(|k2| *k2 != k);
   state.repeating_trigger = None;
   
-  for mappings in mappings.get(&k) {
+  if let Some(mappings) = mappings.get(&k) {
     let should_absorb = {
       match &state.absorbing_trigger {
         Some(absorbing_trigger) => *absorbing_trigger != k,

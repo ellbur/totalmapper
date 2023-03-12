@@ -203,8 +203,8 @@ pub fn filter_keyboards_verbose<'a>(devices: &Vec<&'a str>) -> io::Result<Vec<&'
   let all_keyboards = list_keyboards()?;
   let mut canonical_set: HashSet<String> = HashSet::new();
   for p in all_keyboards {
-    for q in canonicalize(p.dev_path) {
-      for s in q.to_str() {
+    if let Ok(q) = canonicalize(p.dev_path) {
+      if let Some(s) = q.to_str() {
         canonical_set.insert(s.to_string());
       }
     }
