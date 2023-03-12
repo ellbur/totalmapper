@@ -58,21 +58,13 @@ struct HashedLayout {
 }
 
 fn trigger_priority(t1: &Vec<KeyCode>, t2: &Vec<KeyCode>) -> Ordering {
-  if t1.len() > t2.len() {
+  if t1.len() < t2.len() {
     return Ordering::Less;
   }
-  else if t1.len() < t2.len() {
+  else if t1.len() > t2.len() {
     return Ordering::Greater;
   }
   else {
-    for i in (0 .. t1.len()).rev() {
-      if t1[i] < t2[i] {
-        return Ordering::Less;
-      }
-      else if t1[i] > t1[i] {
-        return Ordering::Greater;
-      }
-    }
     return Ordering::Equal;
   }
 }
@@ -112,6 +104,7 @@ fn make_hashed_layout(layout: &Layout) -> HashedLayout {
       Some(existing) => {
         existing.push(mapping.clone());
         existing.sort_by(mapping_priority);
+        existing.reverse();
       }
     }
   }
