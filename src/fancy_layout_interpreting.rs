@@ -7,11 +7,27 @@ use std::collections::HashMap;
 
 pub fn convert(f: &f::Layout) -> Result<s::Layout, String> {
   let mut res = Vec::new();
+  let mut from_table: HashMap<FromSet, Vec<usize>> = HashMap::new();
   
   let alias_mappings = find_alias_mappings(f);
   
   for fm in &f.mappings {
-    res.extend(convert_mapping(&alias_mappings, fm)?);
+    let sms = convert_mapping(&alias_mappings, fm)?;
+    for sm in sms {
+      let from_set = FromSet::new(&sm.from);
+      match from_table.get_mut(&from_set) {
+        Some(v) => v.push(res.len()),
+        None => {
+          let v = vec![res.len()];
+          from_table.insert(from_set.clone(), v);
+        }
+      };
+      res.push(sm);
+    }
+  }
+  
+  for fm in &f.mappings {
+    adjust_repeats(&mut res, &from_table, &alias_mappings, fm)?;
   }
   
   Ok(s::Layout {
@@ -19,11 +35,65 @@ pub fn convert(f: &f::Layout) -> Result<s::Layout, String> {
   })
 }
 
+fn adjust_repeats<'a>(res: &mut Vec<s::Mapping>, from_table: &HashMap<FromSet, Vec<usize>>, alias_mappings: &'a HashMap<String, Vec<&'a f::AliasMapping>>, fm: &f::Mapping) -> Result<(), String> {
+  match fm {
+    f::Mapping::RepeatOnlySingle(single) => {
+      let modifier_combinations = build_combinations(alias_mappings, &single.from.modifiers)?;
+      for modifier_combination in iterate_combinations(&modifier_combinations) {
+        let mut from = modifier_combination.from_modifiers().clone();
+        from.push(single.from.key.clone());
+
+        let repeat = match &single.repeat {
+          f::SingleRepeat::Normal => s::Repeat::Normal,
+          f::SingleRepeat::Disabled => s::Repeat::Disabled,
+          f::SingleRepeat::Special { keys, delay_ms, interval_ms } => s::Repeat::Special {
+            keys: modifier_combination.translate_single_to_keys(&keys)?,
+            delay_ms: *delay_ms,
+            interval_ms: *interval_ms
+          }
+        };
+
+        let from_set = FromSet::new(&from);
+        if let Some(is) = from_table.get(&from_set) {
+          for i in is {
+            let sm = &mut res[*i];
+            sm.repeat = repeat.clone();
+          }
+        }
+        else {
+          res.push(s::Mapping { from: from.clone(), to: from, repeat, absorbing: vec![] });
+        }
+      }
+    },
+    _ => ()
+  };
+  Ok(())
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+struct FromSet {
+  keys: Vec<KeyCode>
+}
+impl FromSet {
+  fn new(keys: &[KeyCode]) -> FromSet {
+    if !keys.is_empty() {
+      let mut res: Vec<KeyCode> = keys[..keys.len()-1].iter().map(|k| *k).collect();
+      res.sort();
+      res.push(*keys.last().unwrap());
+      FromSet { keys: res }
+    }
+    else {
+      FromSet { keys: vec![] }
+    }
+  }
+}
+
 fn convert_mapping<'a>(alias_mappings: &HashMap<String, Vec<&'a f::AliasMapping>>, m: &f::Mapping) -> Result<Vec<s::Mapping>, String> {
   match m {
     f::Mapping::Alias(alias) => Ok(convert_alias(alias)),
     f::Mapping::Single(single) => convert_single(alias_mappings, single),
-    f::Mapping::Row(row) => convert_row(alias_mappings, row)
+    f::Mapping::Row(row) => convert_row(alias_mappings, row),
+    f::Mapping::RepeatOnlySingle(_) => Ok(vec![]),
   }
 }
 
@@ -416,7 +486,7 @@ mod tests {
   use KeyCode::*;
   use crate::fancy_layout_interpreting::convert_row;
 
-use super::{multiply, convert_row_to};
+use super::{multiply, convert_row_to, convert};
   use super::{convert_single, f, s};
   use f::AliasMapping as AM;
   use f::AliasFromKeys as AFK;
@@ -543,10 +613,29 @@ use super::{multiply, convert_row_to};
   #[test]
   fn test_convert_row_to_1() {
     // fn convert_row_to(has_right_shift: bool, modifiers: &Vec<KeyCode>, terminals: &Vec<char>, char_i: usize) -> Result<Option<Vec<KeyCode>>, String>
-    let modifiers = vec![LEFTSHIFT];
+    let modifiers = vec![];
     let terminals = vec!['A'];
     let res = convert_row_to(false, &modifiers, &terminals, 0).unwrap().unwrap();
     assert_eq!(res, vec![LEFTSHIFT, A]);
+  }
+  
+  #[test]
+  fn test_repeat_only_1() {
+    let layout_json = r#"{
+  "mappings": [
+    {"from": "LEFTSHIFT", "to": "@shift"},
+    {"from": ["@shift", {"row": "A"}], "to": {"letters": "S"}},
+    {"from": ["@shift", "A"], "repeat": {"Special": {"keys": "F24", "delay_ms": 180, "interval_ms": 30}}}
+  ]
+}"#;
+    let layout_v = serde_json::from_str(layout_json).unwrap();
+    let fancy_layout = crate::layout_parsing_formatting::parse_layout_from_json(&layout_v).unwrap();
+    let simple_layout = convert(&fancy_layout).unwrap();
+    assert_eq!(simple_layout.mappings.len(), 1);
+    use s::Mapping as SM;
+    use KeyCode::LEFTSHIFT as LS;
+    assert_eq!(simple_layout.mappings[0], SM { from: vec![LS, A], to: vec![LS, S], repeat: s::Repeat::Special {
+      keys: vec![F24], delay_ms: 180, interval_ms: 30 }, absorbing: vec![] });
   }
 }
 

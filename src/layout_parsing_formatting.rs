@@ -3,7 +3,7 @@ use std::str::FromStr;
 use key_codes::KeyCode;
 use serde_json::{Value, Map};
 use Value::{Object, Array};
-use crate::{fancy_keys::{Layout, Mapping, SingleMapping, AliasMapping, RowMapping, Modifier, SingleFromKeys, RowFromKeys, SingleToKeys, RowToKeys, SingleTerminalToKey, SingleRepeat, RowRepeat, Row, AliasToKeys, AliasFromKeys}, key_codes};
+use crate::{fancy_keys::{Layout, Mapping, SingleMapping, AliasMapping, RowMapping, Modifier, SingleFromKeys, RowFromKeys, SingleToKeys, RowToKeys, SingleTerminalToKey, SingleRepeat, RowRepeat, Row, AliasToKeys, AliasFromKeys, RepeatOnlySingleMapping}, key_codes};
 use serde_json::Value as j;
 use serde_json::json;
 use lazy_static::lazy_static;
@@ -93,7 +93,15 @@ fn mapping_all_used_aliases(m: &Mapping) -> Vec<String> {
         }).iter().filter_map(just_mods))
         .chain(row.absorbing.iter().filter_map(just_mods))
         .collect()
-    }
+    },
+    Mapping::RepeatOnlySingle(single) => {
+      single.from.modifiers.iter().filter_map(just_mods)
+        .chain((match &single.repeat {
+          SingleRepeat::Special { keys, delay_ms: _, interval_ms: _ } => &keys.initial,
+          _ => &none
+        }).iter().filter_map(just_mods))
+        .collect()
+    },
   }
 }
 
@@ -159,8 +167,20 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
           }
         }
       }
+      else if has_exactly_keys(mapping_values, &vec!["from", "repeat"]) {
+        let from = parse_from(mapping_values.get("from").unwrap())?;
+        match from {
+          FromKeys::Single(from) => {
+            let repeat = parse_single_repeat(&mapping_values.get("repeat"))?;
+            Ok(Mapping::RepeatOnlySingle(RepeatOnlySingleMapping { from, repeat }))
+          },
+          FromKeys::Row(from) => {
+            Err("Cannot have a repeat-only row mapping".to_owned())
+          }
+        }
+      }
       else {
-        return Err("Mapping must have \"from\" and \"to\"".to_owned())
+        return Err("Mapping must have \"from\" and \"to\" or \"from\" and \"repeat\" ".to_owned())
       }
     },
     _ => {
@@ -361,7 +381,7 @@ fn parse_single_or_alias_to_terminal(to_v: &Value) -> Result<SingleOrAliasToTerm
   if let j::String(to_text) = to_v {
     parse_single_or_alias_to_text(to_text)
   }
-  else if let j::Object(to_attrs) = to_v {
+  else if let j::Object(_) = to_v {
     Err(format!("`to` object of unrecognized form {}", to_v))
   }
   else {
@@ -373,7 +393,7 @@ fn parse_single_to_terminal(to_v: &Value) -> Result<SingleTerminalToKey, String>
   if let j::String(to_text) = to_v {
     parse_single_to_text(to_text)
   }
-  else if let j::Object(to_attrs) = to_v {
+  else if let j::Object(_) = to_v {
     Err(format!("`to` object of unrecognized form {}", to_v))
   }
   else {
@@ -719,7 +739,8 @@ fn format_mapping(mapping: &Mapping) -> Value {
   match mapping {
     Mapping::Single(single) => format_single_mapping(single),
     Mapping::Alias(alias) => format_alias_mapping(alias),
-    Mapping::Row(row) => format_row_mapping(row)
+    Mapping::Row(row) => format_row_mapping(row),
+    Mapping::RepeatOnlySingle(single) => format_repeat_only_single_mapping(single),
   }
 }
 
@@ -733,6 +754,17 @@ fn format_single_mapping(mapping: &SingleMapping) -> Value {
   }
   if let Some(absorbing) = format_absorbing(&mapping.absorbing) {
     keys.insert("absorbing".to_owned(), absorbing);
+  }
+  
+  j::Object(keys)
+}
+
+fn format_repeat_only_single_mapping(mapping: &RepeatOnlySingleMapping) -> Value {
+  let mut keys = Map::new();
+  
+  keys.insert("from".to_owned(), format_single_from(&mapping.from));
+  if let Some(repeat) = format_single_repeat(&mapping.repeat) {
+    keys.insert("repeat".to_owned(), repeat);
   }
   
   j::Object(keys)

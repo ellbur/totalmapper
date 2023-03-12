@@ -17,7 +17,8 @@ pub struct Layout {
 pub enum Mapping {
   Single(SingleMapping),
   Alias(AliasMapping),
-  Row(RowMapping)
+  Row(RowMapping),
+  RepeatOnlySingle(RepeatOnlySingleMapping),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +33,12 @@ pub struct SingleMapping {
   pub to: SingleToKeys,
   pub repeat: SingleRepeat,
   pub absorbing: Vec<Modifier>
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepeatOnlySingleMapping {
+  pub from: SingleFromKeys,
+  pub repeat: SingleRepeat,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
