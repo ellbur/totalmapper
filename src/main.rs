@@ -27,6 +27,8 @@ mod tablet_mode_switch_reader;
 mod monitor_tablet_mode;
 mod example_hardware;
 mod layout_parsing_formatting;
+mod char_production_map;
+mod physical_keyboard_layouts;
 
 use clap::{Arg, App};
 use std::borrow::Cow;

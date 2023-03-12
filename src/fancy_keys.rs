@@ -1,4 +1,6 @@
 
+use std::fmt::Display;
+
 // vim: shiftwidth=2
  
 pub use crate::key_codes::KeyCode; 
@@ -57,7 +59,7 @@ pub struct RowFromKeys {
   pub row: Row
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Row {
   USQuertyGrave,
   USQuerty1,
@@ -66,10 +68,31 @@ pub enum Row {
   USQuertyZ,
 }
 
+impl Display for Row {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Row::USQuertyGrave => f.write_str("`"),
+      Row::USQuerty1 => f.write_str("1"),
+      Row::USQuertyQ => f.write_str("Q"),
+      Row::USQuertyA => f.write_str("A"),
+      Row::USQuertyZ => f.write_str("Z"),
+    }
+  }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modifier {
   Key(KeyCode),
   Alias(String)
+}
+
+impl Display for Modifier {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Modifier::Key(k) => f.write_fmt(format_args!("{}", k)),
+      Modifier::Alias(name) => f.write_str(name)
+    }
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,18 +110,12 @@ pub struct AliasToKeys {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowToKeys {
   pub initial: Vec<Modifier>,
-  pub terminal: RowTerminalToKey
+  pub terminal: String
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SingleTerminalToKey {
   Physical(KeyCode),
-  Null
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RowTerminalToKey {
-  Letters(String),
   Null
 }
 

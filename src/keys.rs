@@ -8,7 +8,7 @@ pub use crate::events::Event;
 pub use Event::Pressed;
 pub use Event::Released;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Mapping {
   pub from: Vec<KeyCode>,
   pub to: Vec<KeyCode>,
@@ -29,7 +29,7 @@ impl Default for Mapping {
   }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Repeat {
   Normal,
   Disabled,
