@@ -29,9 +29,13 @@ pub fn load_layout_from_file(path: &str) -> Result<Layout, String> {
       
   let buf_reader = std::io::BufReader::new(file_in);
   
-  convert_json_error(
-    format!("parsing {}", path).as_str(),
-    serde_json::from_reader(buf_reader)
+  crate::fancy_layout_interpreting::convert(
+    &crate::layout_parsing_formatting::parse_layout_from_json(
+      &convert_json_error(
+        format!("parsing {}", path).as_str(),
+        serde_json::from_reader(buf_reader)
+      )?
+    )?
   )
 }
 

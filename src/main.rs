@@ -12,10 +12,8 @@ mod fancy_layout_interpreting;
 mod key_transforms;
 mod dev_input_rw;
 mod struct_ser;
-mod default_layouts;
 mod default_fancy_layouts;
 mod remapping_loop;
-mod layout_generation;
 mod keyboard_listing;
 mod udev_utils;
 mod layout_loading;
@@ -31,7 +29,6 @@ mod char_production_map;
 mod physical_keyboard_layouts;
 
 use clap::{Arg, App};
-use std::borrow::Cow;
 use keys::Layout;
 
 fn main() {
@@ -235,19 +232,19 @@ fn main() {
     keyboard_listing::list_keyboards_to_stdout().unwrap();
   }
   else if let Some(_) = m.subcommand_matches("list_default_layouts") {
-    for name in (*default_layouts::DEFAULT_LAYOUTS).keys() {
+    for name in (*default_fancy_layouts::DEFAULT_LAYOUTS).keys() {
       println!("{}", name);
     }
   }
   else if let Some(m) = m.subcommand_matches("print_default_layout") {
     let name = m.value_of("NAME").unwrap();
-    match (*default_layouts::DEFAULT_LAYOUTS).get(name) {
+    match (*default_fancy_layouts::DEFAULT_LAYOUTS).get(name) {
       None => {
         println!("Error: no builtin layout named {}", name);
         std::process::exit(1);
       },
       Some(layout) => {
-        println!("{}", serde_json::to_string_pretty(layout).unwrap())
+        println!("{}", layout)
       }
     }
   }
@@ -288,7 +285,7 @@ fn main() {
         std::process::exit(1);
       },
       Ok(layout) => {
-        match udev_utils::add_systemd_service(&*layout) {
+        match udev_utils::add_systemd_service(&layout) {
           Err(msg) => {
             println!("{}", msg);
             std::process::exit(1);
@@ -313,7 +310,7 @@ fn main() {
   }
 }
 
-fn load_layout(default_layout: &Option<&str>, layout_file: &Option<&str>) -> Result<Cow<'static, Layout>, String> {
+fn load_layout(default_layout: &Option<&str>, layout_file: &Option<&str>) -> Result<Layout, String> {
   match (default_layout, layout_file) {
     (None, None) => {
       Err("Error: no layout specified. Use --default-layout or --layout-file.".to_string())
@@ -322,15 +319,21 @@ fn load_layout(default_layout: &Option<&str>, layout_file: &Option<&str>) -> Res
       Err("Error: use either --default-layout or --layout-file, not both.".to_string())
     },
     (Some(name), None) => {
-      match (*default_layouts::DEFAULT_LAYOUTS).get(&name.to_string()) {
+      match (*default_fancy_layouts::DEFAULT_LAYOUTS).get(&name.to_string()) {
         None => Err(format!("Error: no builtin layout named {}", name)),
-        Some(layout) => Ok(Cow::Borrowed(*layout))
+        Some(layout) => Ok(
+          fancy_layout_interpreting::convert(
+            &layout_parsing_formatting::parse_layout_from_json(
+              &serde_json::from_str(layout).unwrap()
+            ).unwrap()
+          ).unwrap()
+        )
       }
     },
     (None, Some(path)) => {
       match layout_loading::load_layout_from_file(path) {
         Err(err) => Err(err),
-        Ok(layout) => Ok(Cow::Owned(layout))
+        Ok(layout) => Ok(layout)
       }
     }
   }
