@@ -123,7 +123,7 @@ pub static SUPER_DVORAK: &'static str = r#"{
 
 #[cfg(test)]
 mod tests {
-  use crate::layout_parsing_formatting::{parse_layout_from_json, format_layout_as_json};
+  use crate::{layout_parsing_formatting::{parse_layout_from_json, format_layout_as_json}, default_fancy_layouts::SUPER_DVORAK};
   use std::str::FromStr;
   
   fn check_consistency(layout_json: &str) {
@@ -147,6 +147,20 @@ mod tests {
     check_consistency(super::CAPS_Q_FOR_ESC);
     check_consistency(super::EASY_SYMBOLS_TAB_FOR_MOVEMENT);
     check_consistency(super::SUPER_DVORAK);
+  }
+  
+  #[test]
+  fn super_dvorak_test_1() {
+    let json = serde_json::Value::from_str(SUPER_DVORAK).unwrap();
+    use crate::events::Event;
+    use Event::Pressed;
+    use crate::key_codes::KeyCode::*;
+    let fancy_layout = parse_layout_from_json(&json).unwrap();
+    let simple_layout = crate::fancy_layout_interpreting::convert(&fancy_layout).unwrap();
+    let mut mapper = crate::key_transforms::Mapper::for_layout(&simple_layout);
+    assert_eq!(mapper.step(Pressed(LEFTSHIFT)).events, vec![Pressed(LEFTSHIFT)]);
+    assert_eq!(mapper.step(Pressed(TAB)).events, vec![]);
+    assert_eq!(mapper.step(Pressed(I)).events, vec![Pressed(UP)]);
   }
 }
 
