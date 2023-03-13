@@ -57,22 +57,6 @@ struct HashedLayout {
   mappings: HashMap<KeyCode, Vec<Mapping>>
 }
 
-fn trigger_priority(t1: &Vec<KeyCode>, t2: &Vec<KeyCode>) -> Ordering {
-  if t1.len() < t2.len() {
-    return Ordering::Less;
-  }
-  else if t1.len() > t2.len() {
-    return Ordering::Greater;
-  }
-  else {
-    return Ordering::Equal;
-  }
-}
-
-fn mapping_priority(m1: &Mapping, m2: &Mapping) -> Ordering {
-  return trigger_priority(&m1.from, &m2.from);
-}
-
 fn make_hashed_layout(layout: &Layout) -> HashedLayout {
   let mut mappings: HashMap<KeyCode, Vec<Mapping>> = HashMap::new();
 
@@ -103,8 +87,6 @@ fn make_hashed_layout(layout: &Layout) -> HashedLayout {
       },
       Some(existing) => {
         existing.push(mapping.clone());
-        existing.sort_by(mapping_priority);
-        existing.reverse();
       }
     }
   }
@@ -450,7 +432,7 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
       }
     };
     
-    for mapping in mappings {
+    for mapping in mappings.iter().rev() {
       if is_supported(&mapping.from, &state.input_pressed_keys, &absorbed_keys, &k) {
         res.append(add_new_mapping(&mut state, &k, &mapping));
         any_hit = true;
