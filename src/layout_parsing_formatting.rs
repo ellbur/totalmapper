@@ -415,7 +415,7 @@ fn parse_single_or_alias_to_text(to_text: &str) -> Result<SingleOrAliasToTermina
     Ok(SingleOrAliasToTerminal::Alias(to_text.to_owned()))
   }
   else {
-    Ok(SingleOrAliasToTerminal::Single(SingleTerminalToKey::Physical(KeyCode::from_str(&to_text).map_err(|_| format!("Unknown key code: {}", to_text))?)))
+    Ok(SingleOrAliasToTerminal::Single(SingleTerminalToKey::Physical(parse_key_code(to_text)?)))
   }
 }
 
@@ -424,7 +424,7 @@ fn parse_single_to_text(to_text: &str) -> Result<SingleTerminalToKey, String> {
     Err(format!("Alias {} not allowed in this position", to_text))
   }
   else {
-    Ok(SingleTerminalToKey::Physical(KeyCode::from_str(&to_text).map_err(|_| format!("Unknown key code: {}", to_text))?))
+    Ok(SingleTerminalToKey::Physical(parse_key_code(to_text)?))
   }
 }
 
@@ -504,7 +504,7 @@ fn parse_to_initial_elem(elem: &Value) -> Result<Modifier, String> {
       Ok(Modifier::Alias(text.to_owned()))
     }
     else {
-      Ok(Modifier::Key(KeyCode::from_str(&text).map_err(|_| format!("Unknown key code: {}", text))?))
+      Ok(Modifier::Key(parse_key_code(&text)?))
     }
   }
   else {
@@ -541,7 +541,19 @@ fn parse_key_code(text: &str) -> Result<KeyCode, String> {
     Err(format!("A real key was expected, but alias modifier {} was found", text))
   }
   else {
-    KeyCode::from_str(&text).map_err(|_| format!("Unknown key code: {}", text))
+    match text {
+      "0" => Ok(KeyCode::K0),
+      "1" => Ok(KeyCode::K1),
+      "2" => Ok(KeyCode::K2),
+      "3" => Ok(KeyCode::K3),
+      "4" => Ok(KeyCode::K4),
+      "5" => Ok(KeyCode::K5),
+      "6" => Ok(KeyCode::K6),
+      "7" => Ok(KeyCode::K7),
+      "8" => Ok(KeyCode::K8),
+      "9" => Ok(KeyCode::K9),
+      _ => KeyCode::from_str(&text).map_err(|_| format!("Unknown key code: {}", text))
+    }
   }
 }
 
@@ -550,7 +562,7 @@ fn parse_modifier(text: &str) -> Result<Modifier, String> {
     Ok(Modifier::Alias(text.to_owned()))
   }
   else {
-    Ok(Modifier::Key(KeyCode::from_str(&text).map_err(|_| format!("Unknown key: {}", text))?))
+    Ok(Modifier::Key(parse_key_code(text)?))
   }
 }
 
@@ -802,7 +814,7 @@ fn format_single_from(from: &SingleFromKeys) -> Value {
     elems.push(format_modifier(m));
   }
   
-  elems.push(j::String(format!("{}", from.key)));
+  elems.push(format_key_code(&from.key));
   
   if elems.len() == 1 {
     elems.remove(0)
@@ -816,7 +828,7 @@ fn format_alias_from(from: &AliasFromKeys) -> Value {
   let mut elems = Vec::new();
   
   for m in &from.keys {
-    elems.push(j::String(format!("{}", m)));
+    elems.push(format_key_code(m));
   }
   
   if elems.len() == 1 {
@@ -845,12 +857,24 @@ fn format_row_from(from: &RowFromKeys) -> Value {
 }
 
 fn format_key_code(k: &KeyCode) -> Value {
-  j::String(format!("{}", k))
+  match k {
+    KeyCode::K0 => json!("0"),
+    KeyCode::K1 => json!("1"),
+    KeyCode::K2 => json!("2"),
+    KeyCode::K3 => json!("3"),
+    KeyCode::K4 => json!("4"),
+    KeyCode::K5 => json!("5"),
+    KeyCode::K6 => json!("6"),
+    KeyCode::K7 => json!("7"),
+    KeyCode::K8 => json!("8"),
+    KeyCode::K9 => json!("9"),
+    _ => j::String(format!("{}", k))
+  }
 }
 
 fn format_modifier(m: &Modifier) -> Value {
   match m {
-    Modifier::Key(k) => j::String(format!("{}", k)),
+    Modifier::Key(k) => format_key_code(k),
     Modifier::Alias(a) => j::String(a.clone())
   }
 }
@@ -896,7 +920,7 @@ fn format_single_to(to: &SingleToKeys) -> Value {
   
   match &to.terminal {
     SingleTerminalToKey::Null => elems.clear(),
-    SingleTerminalToKey::Physical(k) => elems.push(j::String(format!("{}", k))),
+    SingleTerminalToKey::Physical(k) => elems.push(format_key_code(k)),
   }
   
   if elems.len() == 1 {
@@ -1090,6 +1114,42 @@ mod tests {
     let text = r#"{
   "mappings": [
     {"from":"COMMA", "to":"W", "repeat":{"Special":{"keys":["LEFTCTRL","F24"], "delay_ms":180, "interval_ms":30}}}
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let restringed1 = json.to_string();
+    let layout = parse_layout_from_json(&json).unwrap();
+    let formatted = format_layout_as_json(&layout);
+    let restringed2 = formatted.to_string();
+
+    if restringed1 != restringed2 {
+      println!("{}", restringed1);
+      println!("{}", restringed2);
+    }
+    assert_eq!(restringed1, restringed2);
+  }
+
+  #[test]
+  fn test_numbers() {
+    let text = r#"{
+  "mappings": [
+    {"from":["4"], "to":["3"]}
+  ]
+}"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let parsed = parse_layout_from_json(&json).unwrap();
+    assert_eq!(parsed, Layout {
+      mappings: vec![
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: K4}, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(K3) }, repeat: SingleRepeat::Normal, absorbing: vec![] })
+      ]
+    });
+  }
+
+  #[test]
+  fn test_numbers_2() {
+    let text = r#"{
+  "mappings": [
+    {"from":"3", "to":"4", "repeat":{"Special":{"keys":["LEFTCTRL","F24"], "delay_ms":180, "interval_ms":30}}}
   ]
 }"#;
     let json = serde_json::Value::from_str(text).unwrap();
