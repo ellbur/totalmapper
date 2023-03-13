@@ -4,7 +4,6 @@
 use crate::keys::{Layout, Mapping, KeyCode, Pressed, Released, Event, Repeat};
 
 use std::collections::HashMap;
-use std::cmp::Ordering;
 
 fn final_key(trigger: &Vec<KeyCode>) -> KeyCode {
   return trigger[trigger.len() - 1];
