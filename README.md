@@ -21,12 +21,12 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 ## Packages
 
 * Ubuntu amd64:
-    * [`totalmapper_1.3.13-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper_1.3.13-focal_amd64.deb)
-    * [`totalmapper_1.3.13-hirsute_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper_1.3.13-hirsute_amd64.deb)
-    * [`totalmapper_1.3.13-impish_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper_1.3.13-impish_amd64.deb)
+    * [`totalmapper_1.4.1-focal_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.4.0/totalmapper_1.4.1-focal_amd64.deb)
+    * [`totalmapper_1.4.1-jammy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.4.0/totalmapper_1.4.1-jammy_amd64.deb)
+    * [`totalmapper_1.4.1-kinetic_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.4.0/totalmapper_1.4.1-kinetic_amd64.deb)
 * Self-contained Linux binaries (useful for Chrome OS):
-    * [`totalmapper-static-linux-amd64-1.3.13.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper-static-linux-amd64-1.3.13.tar.gz)
-    * [`totalmapper-static-linux-aarch64-1.3.13.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.3.6/totalmapper-static-linux-aarch64-1.3.13.tar.gz)
+    * [`totalmapper-static-linux-amd64-1.4.1.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.4.0/totalmapper-static-linux-amd64-1.4.1.tar.gz)
+    * [`totalmapper-static-linux-aarch64-1.4.1.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.4.0/totalmapper-static-linux-aarch64-1.4.1.tar.gz)
 
 ## From source
 
