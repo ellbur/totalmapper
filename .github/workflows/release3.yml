@@ -26,8 +26,10 @@ jobs:
         run: ./release-scripts/build-raw-aarch64
       - name: Build Focal
         run: ./release-scripts/build-focal
-      - name: Build Impish
-        run: ./release-scripts/build-impish
+      - name: Build Jammy
+        run: ./release-scripts/build-jammy
+      - name: Build Kinetic
+        run: ./release-scripts/build-kinetic
       - name: Make release
         uses: softprops/action-gh-release@v0.1.14
         with:
