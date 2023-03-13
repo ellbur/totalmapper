@@ -46,7 +46,9 @@ fn main() {
         \n\
         To see an example of how to define mappings, run:\n\
         \n\
-            totalmapper print_default_layout caps-for-movement")
+            totalmapper print_default_layout caps-for-movement\n\
+        \n\
+        More documentation is available at https://github.com/ellbur/totalmapper")
       .subcommand(App::new("remap")
         .about("Remap a keyboard")
         .arg(Arg::new("dev_file")
