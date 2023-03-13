@@ -86,7 +86,7 @@ pub static SUPER_DVORAK: &'static str = r#"{
     { "from": {"row": "Z"}, "to": {"letters": "'qjkxbmwvz"}, "repeat": "Disabled" },
     { "from": ["@shift", {"row": "Q"}], "to": {"letters": ":<>PYFGCRL?^"}, "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@shift", {"row": "A"}], "to": {"letters": "AOEUIDHTNS@"}, "absorbing": "@shift", "repeat": "Disabled" },
-    { "from": ["@shift", {"row": "Z"}], "to": {"letters": "\"QJKXBWVZ"}, "absorbing": "@shift", "repeat": "Disabled" },
+    { "from": ["@shift", {"row": "Z"}], "to": {"letters": "\"QJKXBMWVZ"}, "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@symbol", {"row": "Q"}], "to": {"letters": " {}% \\*][|~"}, "repeat": "Disabled" },
     { "from": ["@symbol", {"row": "A"}], "to": {"letters": "   = &)(/_$"}, "repeat": "Disabled" },
     { "from": ["@symbol", {"row": "Z"}], "to": {"letters": "     !+#"}, "repeat": "Disabled" },
