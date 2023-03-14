@@ -147,7 +147,7 @@ fn main() {
         )
       )
       .subcommand(App::new("add_systemd_service")
-        .about("Add (or update, if one exists) a rule in /etc/udev/rules.d/ and service in /etc/systemd/system/ to start totalmapper when a new keyboard is plugged in. Does not affect keyboards already plugged in. Must be run as root.")
+        .about("Add (or update, if one exists) a rule in /etc/udev/rules.d/ and service in /etc/systemd/system/ to start totalmapper when a new keyboard is plugged in. Add --and-start option to also start it for keyboards already plugged in. Must be run as root.")
         .arg(Arg::new("default_layout")
           .long("default-layout")
           .takes_value(true)
