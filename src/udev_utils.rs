@@ -24,7 +24,7 @@ fn convert_json_error<T>(whats_happening: &str, res: Result<T, serde_json::Error
   }
 }
 
-pub fn add_systemd_service(layout: &Layout) -> Result<(), String> {
+pub fn add_systemd_service<'s, I: Iterator<Item=&'s str>>(layout: &Layout, excludes: I) -> Result<(), String> {
   check_usr_bin_totalmapper_exists();
   write_layout_to_global_config(layout)?;
   create_input_group_if_necessary()?;
@@ -32,7 +32,7 @@ pub fn add_systemd_service(layout: &Layout) -> Result<(), String> {
   set_permissions_if_necessary()?;
   create_perm_udev_rule()?;
   write_udev_rule()?;
-  write_systemd_service()?;
+  write_systemd_service(excludes)?;
   refresh_udev()?;
   refresh_systemd()?;
   Ok(())
@@ -286,7 +286,7 @@ fn write_udev_rule() -> Result<(), String> {
   Ok(())
 }
 
-fn write_systemd_service() -> Result<(), String> {
+fn write_systemd_service<'s, I: Iterator<Item = &'s str>>(excludes: I) -> Result<(), String> {
   let path = "/etc/systemd/system/totalmapper@.service";
   let mut out_file = match OpenOptions::new()
     .truncate(true).read(false).create(true).write(true)
@@ -302,22 +302,75 @@ fn write_systemd_service() -> Result<(), String> {
     },
     Ok(out_file) => out_file
   };
-  
-  match out_file.write(
-    "[Unit]\n\
-    Description=Totalmapper\n\
-    \n\
-    [Service]\n\
-    Type=simple\n\
-    User=totalmapper\n\
-    Group=input\n\
-    ExecStart=/usr/bin/totalmapper remap --verbose --layout-file /etc/totalmapper.json --only-if-keyboard --dev-file /%I\n".as_bytes()
-  ) {
+   
+  match out_file.write(build_service_text(excludes).as_bytes()) {
     Err(err) => return Err(format!("{}", err)),
     Ok(_) => ()
   };
   
   Ok(())
+}
+
+fn build_service_text<'s, I: Iterator<Item = &'s str>>(excludes: I) -> String {
+  let exclude_text = build_exclude_text(excludes);
+  
+  format!(
+    "[Unit]\n\
+     Description=Totalmapper\n\
+     \n\
+     [Service]\n\
+     Type=simple\n\
+     User=totalmapper\n\
+     Group=input\n\
+     ExecStart=/usr/bin/totalmapper remap --verbose --layout-file /etc/totalmapper.json --only-if-keyboard {} --dev-file /%I\n",
+    exclude_text
+  )
+}
+
+fn escape_one_char(c: char) -> String {
+  match c {
+    '\\' => "\\\\".to_owned(),
+    ' ' => "\\s".to_owned(),
+    '\x07' => "\\a".to_owned(),
+    '\x08' => "\\b".to_owned(),
+    '\n' => "\\n".to_owned(),
+    '\r' => "\\r".to_owned(),
+    '\t' => "\\t".to_owned(),
+    '"' => "\\\"".to_owned(),
+    '\'' => "'".to_owned(),
+    '*' => "\\x2a".to_owned(),
+    '?' => "\\x3f".to_owned(),
+    _ => {
+      if c.is_control() {
+        let i = c as u64;
+        if i < 128 {
+          format!("\\x{:0>2}", i)
+        }
+        else if i < 0x10000 {
+          format!("\\u{:0>4}", i)
+        }
+        else {
+          format!("\\U{:0>8}", i)
+        }
+      }
+      else {
+        format!("{}", c)
+      }
+    }
+  }
+}
+
+fn systemd_arg_escape(text: &str) -> String {
+  let mut res = Vec::new();
+  for c in text.chars() {
+    res.extend(escape_one_char(c).chars());
+  }
+  res.iter().collect()
+}
+
+fn build_exclude_text<'s, I: Iterator<Item = &'s str>>(excludes: I) -> String {
+  let chunks: Vec<String> = excludes.map(|pattern| format!("--exclude {}", systemd_arg_escape(pattern))).collect();
+  chunks.join(" ")
 }
 
 fn refresh_udev() -> Result<(), String> {
@@ -378,5 +431,23 @@ pub fn start_systemd_service() -> Result<(), String> {
   }
   
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::udev_utils::{systemd_arg_escape, build_exclude_text};
+
+  #[test]
+  fn test_escaping_1() {
+    assert_eq!(systemd_arg_escape("*"), "\\x2a");
+    assert_eq!(systemd_arg_escape("*Mouse*"), "\\x2aMouse\\x2a");
+    assert_eq!(systemd_arg_escape("Dell Mouse"), "Dell\\sMouse");
+  }
+  
+  #[test]
+  fn test_excludes_1() {
+    let excludes = vec!["*Mouse*", "*Switch*"];
+    assert_eq!(build_exclude_text(excludes.into_iter()), "--exclude \\x2aMouse\\x2a --exclude \\x2aSwitch\\x2a");
+  }
 }
 

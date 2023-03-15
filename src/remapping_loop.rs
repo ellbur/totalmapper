@@ -4,8 +4,9 @@
 use crate::keys::Layout;
 use nix::Error;
 use nix::errno::Errno::ENODEV;
+use wildmatch::WildMatch;
 use crate::key_transforms;
-use crate::keyboard_listing::{filter_keyboards_verbose, list_keyboards};
+use crate::keyboard_listing::{filter_keyboards_verbose, list_keyboards, ExtractedKeyboard};
 use crate::dev_input_rw::{DevInputReader, DevInputWriter, Exclusion};
 use std::thread::{spawn, JoinHandle};
 use std::sync::Mutex;
@@ -44,7 +45,7 @@ struct WorkingChild {
   done: Arc<Mutex<bool>>
 }
 
-pub fn do_remapping_loop_auto_all_devices(layout: &Layout, verbose: bool) -> Result<(), String> {
+pub fn do_remapping_loop_auto_all_devices(layout: &Layout, excludes: &[&str], verbose: bool) -> Result<(), String> {
   let mut inotify = Inotify::init().expect("Error initializing");
   inotify.add_watch("/dev/input", WatchMask::CREATE | WatchMask::ATTRIB)
     .expect("Failed to add watch");
@@ -81,17 +82,22 @@ pub fn do_remapping_loop_auto_all_devices(layout: &Layout, verbose: bool) -> Res
     match list_keyboards() {
       Err(e) => break Err(format!("Failed to get the list of keyboards: {}", e)),
       Ok(devs) => {
+        let devs_with_exclusions = flag_excluded(devs, excludes);
+        
         if verbose {
           eprintln!("Got the current list of keyboards:");
-          for dev in &devs {
-            eprintln!(" * {:?}", dev.dev_path);
+          for dev in &devs_with_exclusions {
+            let excluded_flag_text = if dev.excluded { " (excluded)" } else { "" };
+            eprintln!(" * {:?}{}", dev.extracted_keyboard.dev_path, excluded_flag_text);
           }
         }
         
         if verbose {
           eprintln!("Checking which devices are already running:")
         }
-        for dev in devs {
+        for possibly_excluded_dev in devs_with_exclusions {
+          if possibly_excluded_dev.excluded { continue; }
+          let dev = possibly_excluded_dev.extracted_keyboard;
           let already_have_it = children.iter().any(|c| c.dev_path == dev.dev_path);
           if verbose { eprintln!(" * {:?}: {}", dev.dev_path, already_have_it); }
           if !already_have_it {
@@ -127,26 +133,47 @@ pub fn do_remapping_loop_auto_all_devices(layout: &Layout, verbose: bool) -> Res
   }
 }
 
-pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard: bool, layout: &Layout, tablet_mode_switch_device: &Option<&str>, verbose: bool) -> Result<(), String> {
-  if skip_non_keyboard {
+pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard: bool, excludes: &[&str], layout: &Layout, tablet_mode_switch_device: &Option<&str>, verbose: bool) -> Result<(), String> {
+  let mut devices = if skip_non_keyboard {
     match filter_keyboards_verbose(devices) {
-      Err(e) => Err(format!("Failed to get list of devices: {}", e)),
-      Ok(devs) => do_remapping_loop_these_devices(
-        &devs.into_iter().map(|p| Path::new(p).to_path_buf()).collect(),
-        layout,
-        &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf()),
-        verbose
-      )
+      Err(e) => return Err(format!("Failed to get list of devices: {}", e)),
+      Ok(devs) => devs
     }
-  }
-  else {
-    do_remapping_loop_these_devices(
-      &devices.into_iter().map(|p| Path::new(p).to_path_buf()).collect(),
-      layout,
-      &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf()),
-      verbose
-    )
-  }
+  } else {
+    devices.clone()
+  };
+  
+  filter_excludes(&mut devices, excludes);
+  
+  do_remapping_loop_these_devices(
+    &devices.into_iter().map(|p| Path::new(p).to_path_buf()).collect(),
+    layout,
+    &tablet_mode_switch_device.map(|p| Path::new(p).to_path_buf()),
+    verbose
+  )
+}
+
+fn filter_excludes(devices: &mut Vec<&str>, excludes: &[&str]) {
+  let wilds: Vec<WildMatch> = excludes.iter().map(|e| WildMatch::new(e)).collect();
+  devices.retain(|d| {
+    !(&wilds).iter().any(|w| w.matches(d))
+  });
+}
+
+struct PossiblyExcludedDevice {
+  extracted_keyboard: ExtractedKeyboard,
+  excluded: bool
+}
+
+fn flag_excluded(devices: Vec<ExtractedKeyboard>, excludes: &[&str]) -> Vec<PossiblyExcludedDevice> {
+  let wilds: Vec<WildMatch> = excludes.iter().map(|e| WildMatch::new(e)).collect();
+  devices.into_iter().map(|d| {
+    let excluded = wilds.iter().any(|w| w.matches(&d.name));
+    PossiblyExcludedDevice {
+      extracted_keyboard: d,
+      excluded
+    }
+  }).collect()
 }
 
 fn open_device(path: &Path, tablet_mode_switch_device: &Option<PathBuf>) -> Result<RealDriver, String> {

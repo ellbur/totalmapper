@@ -89,6 +89,14 @@ fn main() {
           .help_heading(Some("PROCESS"))
           .help("If the device selected with --dev-file is not a keyboard, exit successfully. Useful when running from udev, since there is no easy way to test in a udev rule whether an input device is a keyboard.")
         )
+        .arg(Arg::new("exclude")
+          .long("exclude")
+          .takes_value(true)
+          .value_name("PATTERN")
+          .multiple_occurrences(true)
+          .help_heading(Some("DEVICE SELECTION"))
+          .help("Don't apply to keyboards with names matching glob-style pattern. To see the names of currently connected keyboards, run `totalmapper list_keyboards`; the part before the ':' is the name. Repeat this option to exclude multiple patterns. Useful when running from udev.")
+        )
         .arg(Arg::new("tablet_mode_switch_device")
           .long("tablet-mode-switch-device")
           .takes_value(true)
@@ -127,7 +135,7 @@ fn main() {
         )
       )
       .subcommand(App::new("monitor_raw")
-        .about("Print all events from a any input device (without consuming them).")
+        .about("Print all events from any input device (without consuming them).")
         .arg(Arg::new("dev_file")
           .long("dev-file")
           .takes_value(true)
@@ -167,6 +175,14 @@ fn main() {
           .help_heading(Some("RUNNING"))
           .help("Also start the service for all existing keyboards")
         )
+        .arg(Arg::new("exclude")
+          .long("exclude")
+          .takes_value(true)
+          .value_name("PATTERN")
+          .multiple_occurrences(true)
+          .help_heading(Some("DEVICE SELECTION"))
+          .help("Don't apply to keyboards with names matching glob-style pattern. To see the names of currently connected keyboards, run `totalmapper list_keyboards`; the part before the ':' is the name. Repeat this option to exclude multiple patterns.")
+        )
       );
       
   let m = app.clone().get_matches();
@@ -203,9 +219,14 @@ fn main() {
           },
           (_, Some(devs), _) => {
             let devs2 = devs.collect();
+            let excludes: Vec<&str> = match m.values_of("exclude") {
+              None => vec![],
+              Some(excludes) => excludes.collect()
+            };
             match remapping_loop::do_remapping_loop_multiple_devices(
                 &devs2,
                 m.occurrences_of("only_if_keyboard") > 0,
+                &excludes,
                 &layout,
                 &m.value_of("tablet_mode_switch_device"),
                 m.occurrences_of("verbose") > 0)
@@ -218,7 +239,11 @@ fn main() {
             }
           },
           (_, _, true) => {
-            match remapping_loop::do_remapping_loop_auto_all_devices(&layout, m.occurrences_of("verbose") > 0) {
+            let excludes: Vec<&str> = match m.values_of("exclude") {
+              None => vec![],
+              Some(excludes) => excludes.collect()
+            };
+            match remapping_loop::do_remapping_loop_auto_all_devices(&layout, &excludes, m.occurrences_of("verbose") > 0) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
@@ -287,7 +312,12 @@ fn main() {
         std::process::exit(1);
       },
       Ok(layout) => {
-        match udev_utils::add_systemd_service(&layout) {
+        let excludes: Vec<&str> = match m.values_of("exclude") {
+          None => vec![],
+          Some(excludes) => excludes.collect()
+        };
+        
+        match udev_utils::add_systemd_service(&layout, excludes.into_iter()) {
           Err(msg) => {
             println!("{}", msg);
             std::process::exit(1);

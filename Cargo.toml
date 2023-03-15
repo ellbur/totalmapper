@@ -20,3 +20,4 @@ ioctls = "0.6.1"
 mio = { version = "0.7.7", features = ["os-ext"] }
 inotify = "0.10.0"
 enum-display-derive = "0.1.1"
+wildmatch = "2.1.1"
