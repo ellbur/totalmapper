@@ -30,10 +30,24 @@ use inotify::{
   WatchMask
 };
 
-pub fn do_remapping_loop_all_devices(layout: &Layout, verbose: bool) -> Result<(), String> {
+pub fn do_remapping_loop_all_devices(layout: &Layout, excludes: &[&str], verbose: bool) -> Result<(), String> {
   match list_keyboards() {
     Err(e) => Err(format!("Failed to get the list of keyboards: {}", e)),
     Ok(devs) => {
+      let devs_with_exclusions = flag_excluded(devs, excludes);
+      
+      if verbose {
+        eprintln!("Got the list of keyboards:");
+        for dev in &devs_with_exclusions {
+          let excluded_flag_text = if dev.excluded { " (excluded)" } else { "" };
+          eprintln!(" * {:?}{}", dev.extracted_keyboard.dev_path, excluded_flag_text);
+        }
+      }
+      
+      let devs: Vec<ExtractedKeyboard> = devs_with_exclusions.into_iter()
+        .filter(|e| !e.excluded)
+        .map(|e| e.extracted_keyboard).collect();
+      
       do_remapping_loop_these_devices(&devs.iter().map(|d| d.dev_path.clone()).collect(), layout, &None, verbose)
     }
   }
@@ -92,12 +106,14 @@ pub fn do_remapping_loop_auto_all_devices(layout: &Layout, excludes: &[&str], ve
           }
         }
         
+        let devs: Vec<ExtractedKeyboard> = devs_with_exclusions.into_iter()
+          .filter(|e| !e.excluded)
+          .map(|e| e.extracted_keyboard).collect();
+        
         if verbose {
           eprintln!("Checking which devices are already running:")
         }
-        for possibly_excluded_dev in devs_with_exclusions {
-          if possibly_excluded_dev.excluded { continue; }
-          let dev = possibly_excluded_dev.extracted_keyboard;
+        for dev in devs {
           let already_have_it = children.iter().any(|c| c.dev_path == dev.dev_path);
           if verbose { eprintln!(" * {:?}: {}", dev.dev_path, already_have_it); }
           if !already_have_it {
@@ -134,17 +150,8 @@ pub fn do_remapping_loop_auto_all_devices(layout: &Layout, excludes: &[&str], ve
 }
 
 pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard: bool, excludes: &[&str], layout: &Layout, tablet_mode_switch_device: &Option<&str>, verbose: bool) -> Result<(), String> {
-  let mut devices = if skip_non_keyboard {
-    match filter_keyboards_verbose(devices) {
-      Err(e) => return Err(format!("Failed to get list of devices: {}", e)),
-      Ok(devs) => devs
-    }
-  } else {
-    devices.clone()
-  };
-  
-  filter_excludes(&mut devices, excludes);
-  
+  let devices = filter_devices_verbose(devices, skip_non_keyboard, excludes, verbose)?;
+
   do_remapping_loop_these_devices(
     &devices.into_iter().map(|p| Path::new(p).to_path_buf()).collect(),
     layout,
@@ -153,11 +160,8 @@ pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard
   )
 }
 
-fn filter_excludes(devices: &mut Vec<&str>, excludes: &[&str]) {
-  let wilds: Vec<WildMatch> = excludes.iter().map(|e| WildMatch::new(e)).collect();
-  devices.retain(|d| {
-    !(&wilds).iter().any(|w| w.matches(d))
-  });
+let filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, excludes: &[&str]) -> Result<Vec<&'s str>, String> {
+  
 }
 
 struct PossiblyExcludedDevice {

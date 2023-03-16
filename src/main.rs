@@ -209,7 +209,11 @@ fn main() {
             println!("Error: Must specify either --dev-file, --all-keyboards, or --auto-all-keyboards, not both");
           },
           (true, _, _) => {
-            match remapping_loop::do_remapping_loop_all_devices(&layout, m.occurrences_of("verbose") > 0) {
+            let excludes: Vec<&str> = match m.values_of("exclude") {
+              None => vec![],
+              Some(excludes) => excludes.collect()
+            };
+            match remapping_loop::do_remapping_loop_all_devices(&layout, &excludes, m.occurrences_of("verbose") > 0) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
