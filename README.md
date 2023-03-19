@@ -89,6 +89,19 @@ sudo totalmapper add_systemd_service --default-layout caps-for-movement
 
 This will install a service definition in `/etc/systemd/system/totalmapper@.service` that will run `totalmapper` under a new user (`totalmapper`) in the `input` group.
 
+If you have a keyboard that you do not want to be remapped, you can exclude it with the `--exclude` option, which takes a glob-like pattern. First, use `totalmapper list_keyboards` to find the name of the keyboard you want to exclude:
+
+```sh
+$ totalmapper list_keyboards
+AT Translated Set 2 keyboard: /dev/input/event4
+```
+
+Then, use the `--exclude` option to exclude it:
+
+```sh
+sudo totalmapper add_systemd_service --default-layout caps-for-movement --exclude 'AT Translated Set 2 keyboard'
+```
+
 ## Without systemd
 
 If your system does not use `systemd` (such as Chrome OS), you can have `totalmapper` monitor for new keyboards itself:
@@ -128,7 +141,7 @@ Layouts are defined with a simple JSON syntax:
 The names of keys are taken from [the Linux header](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h), minus the `KEY_` prefix. Some keys you may not expect are:
 
 * The backtick/tilde key is called `“GRAVE”`.
-* The left and right “windows” are `“LEFTMETA”` and `“RIGHTMETA”`.
+* The left and right “windows” keys are `“LEFTMETA”` and `“RIGHTMETA”`.
 * The period is `“DOT”`.
 * The single quote is `“APOSTROPHE”`.
 
