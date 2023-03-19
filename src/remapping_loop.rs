@@ -6,8 +6,9 @@ use nix::Error;
 use nix::errno::Errno::ENODEV;
 use wildmatch::WildMatch;
 use crate::key_transforms;
-use crate::keyboard_listing::{filter_keyboards_verbose, list_keyboards, ExtractedKeyboard};
+use crate::keyboard_listing::{list_keyboards, ExtractedKeyboard, list_input_devices, ExtractedInputDevice};
 use crate::dev_input_rw::{DevInputReader, DevInputWriter, Exclusion};
+use std::collections::HashMap;
 use std::thread::{spawn, JoinHandle};
 use std::sync::Mutex;
 use std::sync::Arc;
@@ -160,12 +161,72 @@ pub fn do_remapping_loop_multiple_devices(devices: &Vec<&str>, skip_non_keyboard
   )
 }
 
-let filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, excludes: &[&str]) -> Result<Vec<&'s str>, String> {
+fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, excludes: &[&str], verbose: bool) -> Result<Vec<&'s str>, String> {
+  use std::fs::canonicalize;
+  let mut res = Vec::new();
   
+  let all_input_devices = list_input_devices()
+    .map_err(|e| format!("Failed to get the list of keyboards: {}", e))?;
+  
+  let devs_with_exclusions = flag_excluded_input_devices(all_input_devices, excludes);
+  
+  let mut canonical_set: HashMap<String, PossiblyExcludedInputDevice> = HashMap::new();
+  for p in devs_with_exclusions {
+    if let Ok(q) = canonicalize(p.extracted_keyboard.dev_path.clone()) {
+      if let Some(s) = q.to_str() {
+        canonical_set.insert(s.to_string(), p);
+      }
+    }
+    else {
+      if verbose {
+        eprint!("Skipping {:?} because could not canonicalize path", p.extracted_keyboard.dev_path);
+      }
+    }
+  }
+  
+  for s in devices {
+    match canonicalize(Path::new(s)) {
+      Err(_) => {
+        eprintln!("Skipping {} because could not canonicalize path", s);
+      },
+      Ok(c) => {
+        match c.to_str() {
+          None => {
+            eprintln!("Skipping {} because could not c-strify path", s);
+          },
+          Some(l) => {
+            if let Some(dev) = canonical_set.get(&l.to_string()) {
+              if skip_non_keyboard && !dev.extracted_keyboard.is_keyboard {
+                if verbose { eprintln!("Skipping {} ({}) ({}) beacuse it does not appear to be a keyboard", s, l, dev.extracted_keyboard.name); }
+              }
+              else {
+                if dev.excluded {
+                  if verbose { eprintln!("Skipping {} ({}) ({}) beacuse it was excluded by a pattern", s, l, dev.extracted_keyboard.name); }
+                }
+                else {
+                  res.push(*s)
+                }
+              }
+            }
+            else {
+              if verbose { eprintln!("Skipping {} ({}) beacuse it was not found in /proc/bus/input/devices", s, l); }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  Ok(res)
 }
 
 struct PossiblyExcludedDevice {
   extracted_keyboard: ExtractedKeyboard,
+  excluded: bool
+}
+
+struct PossiblyExcludedInputDevice {
+  extracted_keyboard: ExtractedInputDevice,
   excluded: bool
 }
 
@@ -174,6 +235,17 @@ fn flag_excluded(devices: Vec<ExtractedKeyboard>, excludes: &[&str]) -> Vec<Poss
   devices.into_iter().map(|d| {
     let excluded = wilds.iter().any(|w| w.matches(&d.name));
     PossiblyExcludedDevice {
+      extracted_keyboard: d,
+      excluded
+    }
+  }).collect()
+}
+
+fn flag_excluded_input_devices(devices: Vec<ExtractedInputDevice>, excludes: &[&str]) -> Vec<PossiblyExcludedInputDevice> {
+  let wilds: Vec<WildMatch> = excludes.iter().map(|e| WildMatch::new(e)).collect();
+  devices.into_iter().map(|d| {
+    let excluded = wilds.iter().any(|w| w.matches(&d.name));
+    PossiblyExcludedInputDevice {
       extracted_keyboard: d,
       excluded
     }

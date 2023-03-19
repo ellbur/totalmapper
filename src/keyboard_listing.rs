@@ -1,7 +1,7 @@
 
 // vim: shiftwidth=2
 
-use std::fs::{File, canonicalize, read_to_string};
+use std::fs::{File, read_to_string};
 use std::io::{self, BufRead};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
@@ -21,9 +21,21 @@ struct ExtractedProcBusKeyboard {
   name: String
 }
 
+struct ExtractedProcBusInputDevice {
+  sysfs_path: String,
+  name: String,
+  is_keyboard: bool
+}
+
 pub struct ExtractedKeyboard {
   pub dev_path: PathBuf,
   pub name: String
+}
+
+pub struct ExtractedInputDevice {
+  pub dev_path: PathBuf,
+  pub name: String,
+  pub is_keyboard: bool
 }
 
 fn parse_mask_hex(hex: &str) -> Result<HashSet<i32>, ParseIntError> {
@@ -141,6 +153,101 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str) -
   res
 }
 
+fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &str) -> Vec<ExtractedProcBusInputDevice> {
+  let mut res = Vec::new();
+  let lines = proc_bus_input_devices.split('\n');
+  
+  let mut working_sysfs_path = Box::new(None);
+  let mut working_name = Box::new(None);
+  let mut working_ev_mask = Box::new(None);
+  
+  for line in lines {
+    if line.starts_with("I:") {
+      *working_sysfs_path = None;
+      *working_name = None;
+      *working_ev_mask = None;
+    }
+    else if line.starts_with("S: Sysfs=") {
+      let new_sysfs_path = line[9..].to_string();
+      *working_sysfs_path = Some(new_sysfs_path);
+    }
+    else if line.starts_with("N: Name=\"") {
+      let mut name = line[9..].to_string();
+      name = name.trim_end().to_string();
+      if name.ends_with('"') {
+        name = name[..name.len()-1].to_string();
+      }
+      *working_name = Some(name);
+    }
+    else if line.starts_with("B: EV=") {
+      *working_ev_mask = Some(line[6..].to_string());
+    }
+    else if line.starts_with("B: KEY=") {
+      let mut num_keys = 0;
+      for c in line[7..].chars() {
+        num_keys += match c {
+          '0' => 0, '1' => 1, '2' => 1, '3' => 2,
+          '4' => 1, '5' => 2, '6' => 2, '7' => 3,
+          '8' => 1, '9' => 2, 'a' => 2, 'b' => 3,
+          'c' => 2, 'd' => 3, 'e' => 3, 'f' => 4,
+          _ => 0
+        }
+      }
+      
+      let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
+      
+      let ev_set = match &*working_ev_mask {
+        None => HashSet::new(),
+        Some(mask_hex) => {
+          parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new())
+        }
+      };
+      
+      let num_normal_keys = 
+          (key_set.contains(&(KeyCode::A as i32)) as i32)
+        + (key_set.contains(&(KeyCode::B as i32)) as i32)
+        + (key_set.contains(&(KeyCode::C as i32)) as i32)
+        + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
+        + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
+        + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
+        + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
+        + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
+        + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
+        + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32)
+        ;
+      
+      let name = match &*working_name {
+        None => "".to_string(),
+        Some(name) => name.clone()
+      };
+      
+      let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
+      let lacks_leds = !ev_set.contains(&0x11);
+      let has_mouse_in_name = name.contains("Mouse");
+      let is_cros_ec = name == "cros_ec";
+      
+      let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
+      
+      let has_rel_motion = ev_set.contains(&0x2);
+      
+      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && !has_rel_motion && !mousey && !is_cros_ec;
+      
+      match &*working_sysfs_path {
+        None => (),
+        Some(p) => {
+          res.push(ExtractedProcBusInputDevice {
+            sysfs_path: p.to_string(),
+            name,
+            is_keyboard
+          });
+        }
+      }
+    }
+  }
+  
+  res
+}
+
 pub fn list_keyboards() -> io::Result<Vec<ExtractedKeyboard>> {
   let mut res = Vec::new();
   
@@ -156,6 +263,31 @@ pub fn list_keyboards() -> io::Result<Vec<ExtractedKeyboard>> {
           res.push(ExtractedKeyboard {
             dev_path,
             name: dev.name
+          });
+        }
+      }
+    }
+  }
+  
+  Ok(res)
+}
+
+pub fn list_input_devices() -> io::Result<Vec<ExtractedInputDevice>> {
+  let mut res = Vec::new();
+  
+  let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
+  let extracted = extract_input_devices_from_proc_bus_input_devices(&proc_bus_input_devices);
+  
+  for dev in extracted {
+    let p = dev.sysfs_path;
+    if !p.starts_with("/devices/virtual") {
+      match dev_path_for_sysfs_name(&p)? {
+        None => (),
+        Some(dev_path) => {
+          res.push(ExtractedInputDevice {
+            dev_path,
+            name: dev.name,
+            is_keyboard: dev.is_keyboard
           });
         }
       }
@@ -195,45 +327,6 @@ fn dev_path_for_sysfs_name(sysfs_name: &String) -> io::Result<Option<PathBuf>> {
   }
   
   Ok(None)
-}
-
-pub fn filter_keyboards_verbose<'a>(devices: &Vec<&'a str>) -> io::Result<Vec<&'a str>> {
-  let mut res = Vec::new();
-  
-  let all_keyboards = list_keyboards()?;
-  let mut canonical_set: HashSet<String> = HashSet::new();
-  for p in all_keyboards {
-    if let Ok(q) = canonicalize(p.dev_path) {
-      if let Some(s) = q.to_str() {
-        canonical_set.insert(s.to_string());
-      }
-    }
-  }
-  
-  for s in devices {
-    match canonicalize(Path::new(s)) {
-      Err(_) => {
-        eprintln!("Skipping {} because could not canonicalize path", s);
-      },
-      Ok(c) => {
-        match c.to_str() {
-          None => {
-            eprintln!("Skipping {} because could not c-strify path", s);
-          },
-          Some(l) => {
-            if canonical_set.contains(&l.to_string()) {
-              res.push(*s)
-            }
-            else {
-              eprintln!("Skipping {} because {} is not in the list of keyboards", s, l);
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  Ok(res)
 }
 
 #[cfg(test)]
