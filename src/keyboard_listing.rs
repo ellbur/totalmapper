@@ -133,10 +133,8 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str) -
       
       let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
       
-      let has_rel_motion = ev_set.contains(&0x2);
-      
       // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && !has_rel_motion && !mousey && !is_cros_ec {
+      if num_keys >= 20 && num_normal_keys >= 3 && !mousey && !is_cros_ec {
         match &*working_sysfs_path {
           None => (),
           Some(p) => {
@@ -228,9 +226,7 @@ fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &st
       
       let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
       
-      let has_rel_motion = ev_set.contains(&0x2);
-      
-      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && !has_rel_motion && !mousey && !is_cros_ec;
+      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && !mousey && !is_cros_ec;
       
       match &*working_sysfs_path {
         None => (),
