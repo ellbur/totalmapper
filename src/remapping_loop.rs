@@ -165,9 +165,17 @@ fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, e
   use std::fs::canonicalize;
   let mut res = Vec::new();
   
-  let all_input_devices = list_input_devices()
+  let all_input_devices = list_input_devices(verbose)
     .map_err(|e| format!("Failed to get the list of keyboards: {}", e))?;
   
+  if verbose {
+    println!("Found input devices:");
+    for dev in &all_input_devices {
+      println!(" * {} {:?} (is_keyboard={})", dev.name, dev.dev_path, dev.is_keyboard);
+    }
+    println!("");
+  }
+    
   let devs_with_exclusions = flag_excluded_input_devices(all_input_devices, excludes);
   
   let mut canonical_set: HashMap<String, PossiblyExcludedInputDevice> = HashMap::new();
@@ -184,6 +192,14 @@ fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, e
     }
   }
   
+  if verbose {
+    println!("Canonical set:");
+    for p in canonical_set.keys() {
+      println!("* {}", p);
+    }
+    println!("");
+  }
+  
   for s in devices {
     match canonicalize(Path::new(s)) {
       Err(_) => {
@@ -197,11 +213,11 @@ fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, e
           Some(l) => {
             if let Some(dev) = canonical_set.get(&l.to_string()) {
               if skip_non_keyboard && !dev.extracted_keyboard.is_keyboard {
-                if verbose { eprintln!("Skipping {} ({}) ({}) beacuse it does not appear to be a keyboard", s, l, dev.extracted_keyboard.name); }
+                if verbose { eprintln!("Skipping {} ({}) ({}) because it does not appear to be a keyboard", s, l, dev.extracted_keyboard.name); }
               }
               else {
                 if dev.excluded {
-                  if verbose { eprintln!("Skipping {} ({}) ({}) beacuse it was excluded by a pattern", s, l, dev.extracted_keyboard.name); }
+                  if verbose { eprintln!("Skipping {} ({}) ({}) because it was excluded by a pattern", s, l, dev.extracted_keyboard.name); }
                 }
                 else {
                   res.push(*s)
@@ -209,7 +225,7 @@ fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, e
               }
             }
             else {
-              if verbose { eprintln!("Skipping {} ({}) beacuse it was not found in /proc/bus/input/devices", s, l); }
+              if verbose { eprintln!("Skipping {} ({}) because it was not found in /proc/bus/input/devices", s, l); }
             }
           }
         }
