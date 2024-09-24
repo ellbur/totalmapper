@@ -397,7 +397,7 @@ fn refresh_systemd() -> Result<(), String> {
 }
 
 pub fn start_systemd_service() -> Result<(), String> {
-  for k in convert_io_error("listing keyboards", list_keyboards())? {
+  for k in convert_io_error("listing keyboards", list_keyboards(false))? {
     if let Some(p) = k.dev_path.to_str() {
       eprintln!("Starting for {}", p);
       let escaped_p = p.replace('/', "-");

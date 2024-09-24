@@ -112,6 +112,9 @@ fn main() {
       )
       .subcommand(App::new("list_keyboards")
         .about("List keyboard devices under /dev/input")
+        .arg(Arg::new("verbose")
+          .long("verbose")
+        )
       )
       .subcommand(App::new("list_default_layouts")
         .about("List the names of the default layouts")
@@ -259,8 +262,8 @@ fn main() {
       }
     }
   }
-  else if let Some(_) = m.subcommand_matches("list_keyboards") {
-    keyboard_listing::list_keyboards_to_stdout().unwrap();
+  else if let Some(m) = m.subcommand_matches("list_keyboards") {
+    keyboard_listing::list_keyboards_to_stdout(m.occurrences_of("verbose") > 0).unwrap();
   }
   else if let Some(_) = m.subcommand_matches("list_default_layouts") {
     for name in (*default_fancy_layouts::DEFAULT_LAYOUTS).keys() {

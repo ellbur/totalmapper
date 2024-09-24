@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::collections::HashSet;
 use crate::key_codes::KeyCode;
 
-pub fn list_keyboards_to_stdout() -> io::Result<()> {
-  for p in list_keyboards()? {
+pub fn list_keyboards_to_stdout(verbose: bool) -> io::Result<()> {
+  for p in list_keyboards(verbose)? {
     println!("{}: {}", p.name, p.dev_path.to_string_lossy());
   }
   
@@ -58,7 +58,7 @@ fn parse_mask_hex(hex: &str) -> Result<HashSet<i32>, ParseIntError> {
   Ok(res)
 }
 
-fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str) -> Vec<ExtractedProcBusKeyboard> {
+fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> Vec<ExtractedProcBusKeyboard> {
   let mut res = Vec::new();
   let lines = proc_bus_input_devices.split('\n');
   
@@ -135,8 +135,14 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str) -
       
       let has_rel_motion = ev_set.contains(&0x2);
       
+      let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
+      
+      if verbose {
+        println!("Testing if {} is keyboard-like", name);
+      }
+      
       // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && !has_rel_motion && !mousey && !is_cros_ec {
+      if num_keys >= 20 && num_normal_keys >= 3 && (!has_rel_motion || has_keyboard_in_name) && !mousey && !is_cros_ec {
         match &*working_sysfs_path {
           None => (),
           Some(p) => {
@@ -146,6 +152,18 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str) -
             });
           }
         }
+      }
+      else {
+        if verbose {
+          if !(num_keys >= 20) { println!("It is not because it has too few keys") }
+          if !(num_normal_keys >= 3) { println!("It is not because it has too few normal keys") }
+          if !(!has_rel_motion || has_keyboard_in_name) { println!("It is not because it has relative motion like a mouse") }
+          if !(!mousey) { println!("It is not because it looks like a mouse") }
+          if !(!is_cros_ec) { println!("It is not because it's the ChromeOS embedded controller") }
+        }
+      }
+      if verbose {
+        println!("");
       }
     }
   }
@@ -248,15 +266,27 @@ fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &st
   res
 }
 
-pub fn list_keyboards() -> io::Result<Vec<ExtractedKeyboard>> {
+pub fn list_keyboards(verbose: bool) -> io::Result<Vec<ExtractedKeyboard>> {
   let mut res = Vec::new();
   
   let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
-  let extracted = extract_keyboards_from_proc_bus_input_devices(&proc_bus_input_devices);
+  let extracted = extract_keyboards_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
+  
+  if verbose {
+    println!("Found from /proc/bus/input/devices:");
+    for dev in &extracted {
+      println!(" * {} {}", dev.name, dev.sysfs_path);
+    }
+    println!("");
+  }
   
   for dev in extracted {
+    if verbose {
+      println!("Inspecting {}", dev.name);
+    }
+    
     let p = dev.sysfs_path;
-    if !p.starts_with("/devices/virtual") {
+    if !p.starts_with("/devices/virtual/input/") {
       match dev_path_for_sysfs_name(&p)? {
         None => (),
         Some(dev_path) => {
@@ -266,6 +296,15 @@ pub fn list_keyboards() -> io::Result<Vec<ExtractedKeyboard>> {
           });
         }
       }
+    }
+    else {
+      if verbose {
+        println!("It's a virtual keyboard ({}), skipping.", p);
+      }
+    }
+    
+    if verbose {
+      println!("");
     }
   }
   
@@ -367,7 +406,7 @@ mod tests {
   fn test_gaming_mouse_exclusion() {
     let text = example_hardware::GAMING_MOUSE_SETUP_1;
     
-    let keyoards = extract_keyboards_from_proc_bus_input_devices(text);
+    let keyoards = extract_keyboards_from_proc_bus_input_devices(text, false);
     
     println!("Found:");
     for keyboard in &keyoards {

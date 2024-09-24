@@ -32,7 +32,7 @@ use inotify::{
 };
 
 pub fn do_remapping_loop_all_devices(layout: &Layout, excludes: &[&str], verbose: bool) -> Result<(), String> {
-  match list_keyboards() {
+  match list_keyboards(false) {
     Err(e) => Err(format!("Failed to get the list of keyboards: {}", e)),
     Ok(devs) => {
       let devs_with_exclusions = flag_excluded(devs, excludes);
@@ -94,7 +94,7 @@ pub fn do_remapping_loop_auto_all_devices(layout: &Layout, excludes: &[&str], ve
       eprintln!("Getting the current list of keyboards");
     }
     
-    match list_keyboards() {
+    match list_keyboards(false) {
       Err(e) => break Err(format!("Failed to get the list of keyboards: {}", e)),
       Ok(devs) => {
         let devs_with_exclusions = flag_excluded(devs, excludes);
