@@ -94,7 +94,7 @@ pub static SUPER_DVORAK: &'static str = r#"{
     { "from": ["@shift", "@symbol", {"row": "A"}], "to": ["RIGHTALT", {"letters": "aoeuidhtns-"}], "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@shift", "@symbol", {"row": "Z"}], "to": ["RIGHTALT", {"letters": "'qjkxbmwvz"}], "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@shift", "@symbol", "SPACE"], "to": ["RIGHTALT", "N"], "repeat": "Disabled" },
-    { "from": ["@symbol", "Q"], "to": "ESC", "absorbing": ["@symbol"], "repeat": "Disabled" },
+    { "from": ["@symbol", "Q"], "to": "ESC", "absorbing": "@symbol", "repeat": "Disabled" },
     { "from": ["@movement", "J"], "to": "LEFT" },
     { "from": ["@movement", "I"], "to": "UP" },
     { "from": ["@movement", "K"], "to": "DOWN" },
@@ -134,18 +134,46 @@ mod tests {
     let restringed2 = formatted.to_string();
 
     if restringed1 != restringed2 {
-      println!("{}", restringed1);
-      println!("{}", restringed2);
+      let changes = difference::Changeset::new(&restringed1, &restringed2, "");
+
+      for d in changes.diffs {
+        use colored::Colorize;
+        print!("{}",
+          match d {
+            difference::Difference::Same(t) => t.normal(),
+            difference::Difference::Add(t) => t.green(),
+            difference::Difference::Rem(t) => t.red()
+          }
+        );
+      }
+      println!("");
+      println!("");
     }
     assert_eq!(restringed1, restringed2);
   }
   
   #[test]
-  fn test_consistent_formatting() {
+  fn test_consistent_formatting_1() {
     check_consistency(super::CAPS_LOCK_FOR_MOVEMENT);
+  }
+  
+  #[test]
+  fn test_consistent_formatting_2() {
     check_consistency(super::EASY_SYMBOLS);
+  }
+  
+  #[test]
+  fn test_consistent_formatting_3() {
     check_consistency(super::CAPS_Q_FOR_ESC);
+  }
+  
+  #[test]
+  fn test_consistent_formatting_4() {
     check_consistency(super::EASY_SYMBOLS_TAB_FOR_MOVEMENT);
+  }
+  
+  #[test]
+  fn test_consistent_formatting_5() {
     check_consistency(super::SUPER_DVORAK);
   }
   
