@@ -1,440 +1,461 @@
-
 // vim: shiftwidth=2
 
-use std::fs::{File, read_to_string};
+use crate::key_codes::KeyCode;
+use std::collections::HashSet;
+use std::fs::{read_to_string, File};
 use std::io::{self, BufRead};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
-use std::collections::HashSet;
-use crate::key_codes::KeyCode;
 
 pub fn list_keyboards_to_stdout(verbose: bool) -> io::Result<()> {
-  for p in list_keyboards(verbose)? {
-    println!("{}: {}", p.name, p.dev_path.to_string_lossy());
-  }
-  
-  Ok(())
+    for p in list_keyboards(verbose)? {
+        println!("{}: {}", p.name, p.dev_path.to_string_lossy());
+    }
+
+    Ok(())
 }
 
 struct ExtractedProcBusKeyboard {
-  sysfs_path: String,
-  name: String
+    sysfs_path: String,
+    name: String,
 }
 
 struct ExtractedProcBusInputDevice {
-  sysfs_path: String,
-  name: String,
-  is_keyboard: bool
+    sysfs_path: String,
+    name: String,
+    is_keyboard: bool,
 }
 
 pub struct ExtractedKeyboard {
-  pub dev_path: PathBuf,
-  pub name: String
+    pub dev_path: PathBuf,
+    pub name: String,
 }
 
 pub struct ExtractedInputDevice {
-  pub dev_path: PathBuf,
-  pub name: String,
-  pub is_keyboard: bool
+    pub dev_path: PathBuf,
+    pub name: String,
+    pub is_keyboard: bool,
 }
 
 fn parse_mask_hex(hex: &str) -> Result<HashSet<i32>, ParseIntError> {
-  let tokens = hex.rsplit(' ');
-  
-  let mut res = HashSet::new();
-  
-  let mut token_index = 0;
-  for token in tokens {
-    let num = u64::from_str_radix(token, 16)?;
-    for i in 0u8 .. 63u8 {
-      let mask = 1u64 << i;
-      if (num & mask) != 0 {
-        res.insert((i as i32) + token_index * 64);
-      }
+    let tokens = hex.rsplit(' ');
+
+    let mut res = HashSet::new();
+
+    let mut token_index = 0;
+    for token in tokens {
+        let num = u64::from_str_radix(token, 16)?;
+        for i in 0u8..63u8 {
+            let mask = 1u64 << i;
+            if (num & mask) != 0 {
+                res.insert((i as i32) + token_index * 64);
+            }
+        }
+        token_index += 1;
     }
-    token_index += 1;
-  }
-  
-  Ok(res)
+
+    Ok(res)
 }
 
-fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> Vec<ExtractedProcBusKeyboard> {
-  let mut res = Vec::new();
-  let lines = proc_bus_input_devices.split('\n');
-  
-  let mut working_sysfs_path = Box::new(None);
-  let mut working_name = Box::new(None);
-  let mut working_ev_mask = Box::new(None);
-  
-  for line in lines {
-    if line.starts_with("I:") {
-      *working_sysfs_path = None;
-      *working_name = None;
-      *working_ev_mask = None;
-    }
-    else if line.starts_with("S: Sysfs=") {
-      let new_sysfs_path = line[9..].to_string();
-      *working_sysfs_path = Some(new_sysfs_path);
-    }
-    else if line.starts_with("N: Name=\"") {
-      let mut name = line[9..].to_string();
-      name = name.trim_end().to_string();
-      if name.ends_with('"') {
-        name = name[..name.len()-1].to_string();
-      }
-      *working_name = Some(name);
-    }
-    else if line.starts_with("B: EV=") {
-      *working_ev_mask = Some(line[6..].to_string());
-    }
-    else if line.starts_with("B: KEY=") {
-      let mut num_keys = 0;
-      for c in line[7..].chars() {
-        num_keys += match c {
-          '0' => 0, '1' => 1, '2' => 1, '3' => 2,
-          '4' => 1, '5' => 2, '6' => 2, '7' => 3,
-          '8' => 1, '9' => 2, 'a' => 2, 'b' => 3,
-          'c' => 2, 'd' => 3, 'e' => 3, 'f' => 4,
-          _ => 0
+fn extract_keyboards_from_proc_bus_input_devices(
+    proc_bus_input_devices: &str,
+    verbose: bool,
+) -> Vec<ExtractedProcBusKeyboard> {
+    let mut res = Vec::new();
+    let lines = proc_bus_input_devices.split('\n');
+
+    let mut working_sysfs_path = Box::new(None);
+    let mut working_name = Box::new(None);
+    let mut working_ev_mask = Box::new(None);
+
+    for line in lines {
+        if line.starts_with("I:") {
+            *working_sysfs_path = None;
+            *working_name = None;
+            *working_ev_mask = None;
+        } else if line.starts_with("S: Sysfs=") {
+            let new_sysfs_path = line[9..].to_string();
+            *working_sysfs_path = Some(new_sysfs_path);
+        } else if line.starts_with("N: Name=\"") {
+            let mut name = line[9..].to_string();
+            name = name.trim_end().to_string();
+            if name.ends_with('"') {
+                name = name[..name.len() - 1].to_string();
+            }
+            *working_name = Some(name);
+        } else if line.starts_with("B: EV=") {
+            *working_ev_mask = Some(line[6..].to_string());
+        } else if line.starts_with("B: KEY=") {
+            let mut num_keys = 0;
+            for c in line[7..].chars() {
+                num_keys += match c {
+                    '0' => 0,
+                    '1' => 1,
+                    '2' => 1,
+                    '3' => 2,
+                    '4' => 1,
+                    '5' => 2,
+                    '6' => 2,
+                    '7' => 3,
+                    '8' => 1,
+                    '9' => 2,
+                    'a' => 2,
+                    'b' => 3,
+                    'c' => 2,
+                    'd' => 3,
+                    'e' => 3,
+                    'f' => 4,
+                    _ => 0,
+                }
+            }
+
+            let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
+
+            let ev_set = match &*working_ev_mask {
+                None => HashSet::new(),
+                Some(mask_hex) => parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new()),
+            };
+
+            let num_normal_keys = (key_set.contains(&(KeyCode::A as i32)) as i32)
+                + (key_set.contains(&(KeyCode::B as i32)) as i32)
+                + (key_set.contains(&(KeyCode::C as i32)) as i32)
+                + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
+                + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
+                + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
+                + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
+                + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
+                + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
+                + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32);
+
+            let name = match &*working_name {
+                None => "".to_string(),
+                Some(name) => name.clone(),
+            };
+
+            let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
+            let lacks_leds = !ev_set.contains(&0x11);
+            let has_mouse_in_name = name.contains("Mouse");
+            let is_cros_ec = name == "cros_ec";
+
+            let mousey =
+                (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
+
+            let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
+
+            if verbose {
+                println!("Testing if {} is keyboard-like", name);
+            }
+
+            // Heuristic for what is a keyboard
+            if num_keys >= 20
+                && num_normal_keys >= 3
+                && (has_keyboard_in_name || (!mousey && !is_cros_ec))
+            {
+                match &*working_sysfs_path {
+                    None => (),
+                    Some(p) => {
+                        res.push(ExtractedProcBusKeyboard {
+                            sysfs_path: p.to_string(),
+                            name,
+                        });
+                    }
+                }
+            } else {
+                if verbose {
+                    if !(num_keys >= 20) {
+                        println!("It is not because it has too few keys")
+                    }
+                    if !(num_normal_keys >= 3) {
+                        println!("It is not because it has too few normal keys")
+                    }
+                    if !(!mousey) {
+                        println!("It is not because it looks like a mouse")
+                    }
+                    if !(!is_cros_ec) {
+                        println!("It is not because it's the ChromeOS embedded controller")
+                    }
+                }
+            }
+            if verbose {
+                println!("");
+            }
         }
-      }
-      
-      let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
-      
-      let ev_set = match &*working_ev_mask {
-        None => HashSet::new(),
-        Some(mask_hex) => {
-          parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new())
-        }
-      };
-      
-      let num_normal_keys = 
-          (key_set.contains(&(KeyCode::A as i32)) as i32)
-        + (key_set.contains(&(KeyCode::B as i32)) as i32)
-        + (key_set.contains(&(KeyCode::C as i32)) as i32)
-        + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
-        + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
-        + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
-        + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
-        + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
-        + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
-        + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32)
-        ;
-      
-      let name = match &*working_name {
-        None => "".to_string(),
-        Some(name) => name.clone()
-      };
-      
-      let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
-      let lacks_leds = !ev_set.contains(&0x11);
-      let has_mouse_in_name = name.contains("Mouse");
-      let is_cros_ec = name == "cros_ec";
-      
-      let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
-      
-      let has_rel_motion = ev_set.contains(&0x2);
-      
-      let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
-      
-      if verbose {
-        println!("Testing if {} is keyboard-like", name);
-      }
-      
-      // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && (!has_rel_motion || has_keyboard_in_name) && !mousey && !is_cros_ec {
-        match &*working_sysfs_path {
-          None => (),
-          Some(p) => {
-            res.push(ExtractedProcBusKeyboard {
-              sysfs_path: p.to_string(),
-              name
-            });
-          }
-        }
-      }
-      else {
-        if verbose {
-          if !(num_keys >= 20) { println!("It is not because it has too few keys") }
-          if !(num_normal_keys >= 3) { println!("It is not because it has too few normal keys") }
-          if !(!has_rel_motion || has_keyboard_in_name) { println!("It is not because it has relative motion like a mouse") }
-          if !(!mousey) { println!("It is not because it looks like a mouse") }
-          if !(!is_cros_ec) { println!("It is not because it's the ChromeOS embedded controller") }
-        }
-      }
-      if verbose {
-        println!("");
-      }
     }
-  }
-  
-  res
+
+    res
 }
 
-fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> Vec<ExtractedProcBusInputDevice> {
-  let mut res = Vec::new();
-  let lines = proc_bus_input_devices.split('\n');
-  
-  let mut working_sysfs_path = Box::new(None);
-  let mut working_name = Box::new(None);
-  let mut working_ev_mask = Box::new(None);
-  
-  for line in lines {
-    if line.starts_with("I:") {
-      *working_sysfs_path = None;
-      *working_name = None;
-      *working_ev_mask = None;
-    }
-    else if line.starts_with("S: Sysfs=") {
-      let new_sysfs_path = line[9..].to_string();
-      *working_sysfs_path = Some(new_sysfs_path);
-    }
-    else if line.starts_with("N: Name=\"") {
-      let mut name = line[9..].to_string();
-      name = name.trim_end().to_string();
-      if name.ends_with('"') {
-        name = name[..name.len()-1].to_string();
-      }
-      *working_name = Some(name);
-    }
-    else if line.starts_with("B: EV=") {
-      *working_ev_mask = Some(line[6..].to_string());
-    }
-    else if line.starts_with("B: KEY=") {
-      let mut num_keys = 0;
-      for c in line[7..].chars() {
-        num_keys += match c {
-          '0' => 0, '1' => 1, '2' => 1, '3' => 2,
-          '4' => 1, '5' => 2, '6' => 2, '7' => 3,
-          '8' => 1, '9' => 2, 'a' => 2, 'b' => 3,
-          'c' => 2, 'd' => 3, 'e' => 3, 'f' => 4,
-          _ => 0
+fn extract_input_devices_from_proc_bus_input_devices(
+    proc_bus_input_devices: &str,
+    verbose: bool,
+) -> Vec<ExtractedProcBusInputDevice> {
+    let mut res = Vec::new();
+    let lines = proc_bus_input_devices.split('\n');
+
+    let mut working_sysfs_path = Box::new(None);
+    let mut working_name = Box::new(None);
+    let mut working_ev_mask = Box::new(None);
+
+    for line in lines {
+        if line.starts_with("I:") {
+            *working_sysfs_path = None;
+            *working_name = None;
+            *working_ev_mask = None;
+        } else if line.starts_with("S: Sysfs=") {
+            let new_sysfs_path = line[9..].to_string();
+            *working_sysfs_path = Some(new_sysfs_path);
+        } else if line.starts_with("N: Name=\"") {
+            let mut name = line[9..].to_string();
+            name = name.trim_end().to_string();
+            if name.ends_with('"') {
+                name = name[..name.len() - 1].to_string();
+            }
+            *working_name = Some(name);
+        } else if line.starts_with("B: EV=") {
+            *working_ev_mask = Some(line[6..].to_string());
+        } else if line.starts_with("B: KEY=") {
+            let mut num_keys = 0;
+            for c in line[7..].chars() {
+                num_keys += match c {
+                    '0' => 0,
+                    '1' => 1,
+                    '2' => 1,
+                    '3' => 2,
+                    '4' => 1,
+                    '5' => 2,
+                    '6' => 2,
+                    '7' => 3,
+                    '8' => 1,
+                    '9' => 2,
+                    'a' => 2,
+                    'b' => 3,
+                    'c' => 2,
+                    'd' => 3,
+                    'e' => 3,
+                    'f' => 4,
+                    _ => 0,
+                }
+            }
+
+            let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
+
+            let ev_set = match &*working_ev_mask {
+                None => HashSet::new(),
+                Some(mask_hex) => parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new()),
+            };
+
+            let num_normal_keys = (key_set.contains(&(KeyCode::A as i32)) as i32)
+                + (key_set.contains(&(KeyCode::B as i32)) as i32)
+                + (key_set.contains(&(KeyCode::C as i32)) as i32)
+                + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
+                + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
+                + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
+                + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
+                + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
+                + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
+                + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32);
+
+            let name = match &*working_name {
+                None => "".to_string(),
+                Some(name) => name.clone(),
+            };
+
+            let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
+            let lacks_leds = !ev_set.contains(&0x11);
+            let has_mouse_in_name = name.contains("Mouse");
+            let is_cros_ec = name == "cros_ec";
+
+            let mousey =
+                (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
+
+            let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
+
+            let is_keyboard = num_keys >= 20
+                && num_normal_keys >= 3
+                && (has_keyboard_in_name || (!mousey && !is_cros_ec));
+
+            match &*working_sysfs_path {
+                None => (),
+                Some(p) => {
+                    res.push(ExtractedProcBusInputDevice {
+                        sysfs_path: p.to_string(),
+                        name,
+                        is_keyboard,
+                    });
+                }
+            }
         }
-      }
-      
-      let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
-      
-      let ev_set = match &*working_ev_mask {
-        None => HashSet::new(),
-        Some(mask_hex) => {
-          parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new())
-        }
-      };
-      
-      let num_normal_keys = 
-          (key_set.contains(&(KeyCode::A as i32)) as i32)
-        + (key_set.contains(&(KeyCode::B as i32)) as i32)
-        + (key_set.contains(&(KeyCode::C as i32)) as i32)
-        + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
-        + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
-        + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
-        + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
-        + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
-        + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
-        + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32)
-        ;
-      
-      let name = match &*working_name {
-        None => "".to_string(),
-        Some(name) => name.clone()
-      };
-      
-      let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
-      let lacks_leds = !ev_set.contains(&0x11);
-      let has_mouse_in_name = name.contains("Mouse");
-      let is_cros_ec = name == "cros_ec";
-      
-      let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
-      
-      let has_rel_motion = ev_set.contains(&0x2);
-      
-      let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
-      
-      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && (!has_rel_motion || has_keyboard_in_name) && !mousey && !is_cros_ec;
-      
-      match &*working_sysfs_path {
-        None => (),
-        Some(p) => {
-          res.push(ExtractedProcBusInputDevice {
-            sysfs_path: p.to_string(),
-            name,
-            is_keyboard
-          });
-        }
-      }
     }
-  }
-  
-  res
+
+    res
 }
 
 pub fn list_keyboards(verbose: bool) -> io::Result<Vec<ExtractedKeyboard>> {
-  let mut res = Vec::new();
-  
-  let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
-  let extracted = extract_keyboards_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
-  
-  if verbose {
-    println!("Found from /proc/bus/input/devices:");
-    for dev in &extracted {
-      println!(" * {} {}", dev.name, dev.sysfs_path);
-    }
-    println!("");
-  }
-  
-  for dev in extracted {
+    let mut res = Vec::new();
+
+    let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
+    let extracted = extract_keyboards_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
+
     if verbose {
-      println!("Inspecting {}", dev.name);
-    }
-    
-    let p = dev.sysfs_path;
-    if !p.starts_with("/devices/virtual/input/") {
-      match dev_path_for_sysfs_name(&p)? {
-        None => (),
-        Some(dev_path) => {
-          res.push(ExtractedKeyboard {
-            dev_path,
-            name: dev.name
-          });
+        println!("Found from /proc/bus/input/devices:");
+        for dev in &extracted {
+            println!(" * {} {}", dev.name, dev.sysfs_path);
         }
-      }
+        println!("");
     }
-    else {
-      if verbose {
-        println!("It's a virtual keyboard ({}), skipping.", p);
-      }
+
+    for dev in extracted {
+        if verbose {
+            println!("Inspecting {}", dev.name);
+        }
+
+        let p = dev.sysfs_path;
+        if !p.starts_with("/devices/virtual/input/") {
+            match dev_path_for_sysfs_name(&p)? {
+                None => (),
+                Some(dev_path) => {
+                    res.push(ExtractedKeyboard {
+                        dev_path,
+                        name: dev.name,
+                    });
+                }
+            }
+        } else {
+            if verbose {
+                println!("It's a virtual keyboard ({}), skipping.", p);
+            }
+        }
+
+        if verbose {
+            println!("");
+        }
     }
-    
-    if verbose {
-      println!("");
-    }
-  }
-  
-  Ok(res)
+
+    Ok(res)
 }
 
 pub fn list_input_devices(verbose: bool) -> io::Result<Vec<ExtractedInputDevice>> {
-  let mut res = Vec::new();
-  
-  let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
-  let extracted = extract_input_devices_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
-  
-  for dev in extracted {
-    let p = dev.sysfs_path;
-    if !p.starts_with("/devices/virtual/input/") {
-      match dev_path_for_sysfs_name(&p)? {
-        None => (),
-        Some(dev_path) => {
-          res.push(ExtractedInputDevice {
-            dev_path,
-            name: dev.name,
-            is_keyboard: dev.is_keyboard
-          });
+    let mut res = Vec::new();
+
+    let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
+    let extracted =
+        extract_input_devices_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
+
+    for dev in extracted {
+        let p = dev.sysfs_path;
+        if !p.starts_with("/devices/virtual/input/") {
+            match dev_path_for_sysfs_name(&p)? {
+                None => (),
+                Some(dev_path) => {
+                    res.push(ExtractedInputDevice {
+                        dev_path,
+                        name: dev.name,
+                        is_keyboard: dev.is_keyboard,
+                    });
+                }
+            }
         }
-      }
     }
-  }
-  
-  Ok(res)
+
+    Ok(res)
 }
 
 fn dev_path_for_sysfs_name(sysfs_name: &String) -> io::Result<Option<PathBuf>> {
-  let mut sysfs_path = "/sys".to_string();
-  sysfs_path.push_str(sysfs_name);
+    let mut sysfs_path = "/sys".to_string();
+    sysfs_path.push_str(sysfs_name);
 
-  for _entry in Path::new(&sysfs_path).read_dir()? {
-    let entry = _entry?;
-    let path = entry.path();
-    match path.file_name() {
-      None => (),
-      Some(_name) => {
-        let name = _name.to_string_lossy();
-        if name.starts_with("event") {
-          let mut uevent_path = path.clone();
-          uevent_path.push("uevent");
-          for _line in io::BufReader::new(File::open(uevent_path)?).lines() {
-            let line = _line?;
-            if line.starts_with("DEVNAME=") {
-              let dev_name = line[8..].to_string();
-              let mut dev_path = PathBuf::new();
-              dev_path.push("/dev");
-              dev_path.push(dev_name);
-              return Ok(Some(dev_path));
+    for _entry in Path::new(&sysfs_path).read_dir()? {
+        let entry = _entry?;
+        let path = entry.path();
+        match path.file_name() {
+            None => (),
+            Some(_name) => {
+                let name = _name.to_string_lossy();
+                if name.starts_with("event") {
+                    let mut uevent_path = path.clone();
+                    uevent_path.push("uevent");
+                    for _line in io::BufReader::new(File::open(uevent_path)?).lines() {
+                        let line = _line?;
+                        if line.starts_with("DEVNAME=") {
+                            let dev_name = line[8..].to_string();
+                            let mut dev_path = PathBuf::new();
+                            dev_path.push("/dev");
+                            dev_path.push(dev_name);
+                            return Ok(Some(dev_path));
+                        }
+                    }
+                }
             }
-          }
         }
-      }
     }
-  }
-  
-  Ok(None)
+
+    Ok(None)
 }
 
 #[cfg(test)]
 mod tests {
-  use crate::example_hardware;
-  use super::*;
+    use super::*;
+    use crate::example_hardware;
 
-  #[test]
-  fn test_parse_mask() {
-    let res = parse_mask_hex("120013").unwrap();
-    
-    for item in &res {
-      println!(" * {:x}", item)
+    #[test]
+    fn test_parse_mask() {
+        let res = parse_mask_hex("120013").unwrap();
+
+        for item in &res {
+            println!(" * {:x}", item)
+        }
+
+        assert_eq!(res.len(), 5);
+        assert!(res.contains(&0x00));
+        assert!(res.contains(&0x01));
+        assert!(res.contains(&0x04));
+        assert!(res.contains(&0x11));
+        assert!(res.contains(&0x14));
     }
-    
-    assert_eq!(res.len(), 5);
-    assert!(res.contains(&0x00));
-    assert!(res.contains(&0x01));
-    assert!(res.contains(&0x04));
-    assert!(res.contains(&0x11));
-    assert!(res.contains(&0x14));
-  }
-  
-  #[test]
-  fn test_parse_mask_2() {
-    let res = parse_mask_hex("1 1").unwrap();
-    
-    for item in &res {
-      println!(" * {:x}", item)
+
+    #[test]
+    fn test_parse_mask_2() {
+        let res = parse_mask_hex("1 1").unwrap();
+
+        for item in &res {
+            println!(" * {:x}", item)
+        }
+
+        assert_eq!(res.len(), 2);
+        assert!(res.contains(&0));
+        assert!(res.contains(&64));
     }
-    
-    assert_eq!(res.len(), 2);
-    assert!(res.contains(&0));
-    assert!(res.contains(&64));
-  }
-  
-  #[test]
-  fn test_gaming_mouse_exclusion() {
-    let text = example_hardware::GAMING_MOUSE_SETUP_1;
-    
-    let keyoards = extract_keyboards_from_proc_bus_input_devices(text, false);
-    
-    println!("Found:");
-    for keyboard in &keyoards {
-      println!(" * {}", keyboard.name);
+
+    #[test]
+    fn test_gaming_mouse_exclusion() {
+        let text = example_hardware::GAMING_MOUSE_SETUP_1;
+
+        let keyoards = extract_keyboards_from_proc_bus_input_devices(text, false);
+
+        println!("Found:");
+        for keyboard in &keyoards {
+            println!(" * {}", keyboard.name);
+        }
+        println!("");
+
+        let mut desired_name_set: HashSet<String> = HashSet::new();
+        desired_name_set.insert("AT Translated Set 2 keyboard".to_string());
+
+        let mut actual_name_set: HashSet<String> = HashSet::new();
+        for keyboard in &keyoards {
+            actual_name_set.insert(keyboard.name.clone());
+        }
+
+        for actual_name in &actual_name_set {
+            if !desired_name_set.contains(actual_name) {
+                panic!("Found spurious {}", actual_name);
+            }
+        }
+
+        for desired_name in &desired_name_set {
+            if !actual_name_set.contains(desired_name) {
+                panic!("Failed to detect {}", desired_name);
+            }
+        }
     }
-    println!("");
-    
-    let mut desired_name_set: HashSet<String> = HashSet::new();
-    desired_name_set.insert("AT Translated Set 2 keyboard".to_string());
-    
-    let mut actual_name_set: HashSet<String> = HashSet::new();
-    for keyboard in &keyoards {
-      actual_name_set.insert(keyboard.name.clone());
-    }
-    
-    for actual_name in &actual_name_set {
-      if !desired_name_set.contains(actual_name) {
-        panic!("Found spurious {}", actual_name);
-      }
-    }
-    
-    for desired_name in &desired_name_set {
-      if !actual_name_set.contains(desired_name) {
-        panic!("Failed to detect {}", desired_name);
-      }
-    }
-  }
 }
-
