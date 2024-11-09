@@ -180,6 +180,54 @@ fn extract_keyboards_from_proc_bus_input_devices(
                 println!("");
             }
         }
+      }
+      
+      let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
+      
+      let ev_set = match &*working_ev_mask {
+        None => HashSet::new(),
+        Some(mask_hex) => {
+          parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new())
+        }
+      };
+      
+      let num_normal_keys = 
+          (key_set.contains(&(KeyCode::A as i32)) as i32)
+        + (key_set.contains(&(KeyCode::B as i32)) as i32)
+        + (key_set.contains(&(KeyCode::C as i32)) as i32)
+        + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
+        + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
+        + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
+        + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
+        + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
+        + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
+        + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32)
+        ;
+      
+      let name = match &*working_name {
+        None => "".to_string(),
+        Some(name) => name.clone()
+      };
+      
+      let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
+      let lacks_leds = !ev_set.contains(&0x11);
+      let has_mouse_in_name = name.contains("Mouse");
+      let is_cros_ec = name == "cros_ec";
+      
+      let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
+      
+      // Heuristic for what is a keyboard
+      if num_keys >= 20 && num_normal_keys >= 3 && !mousey && !is_cros_ec {
+        match &*working_sysfs_path {
+          None => (),
+          Some(p) => {
+            res.push(ExtractedProcBusKeyboard {
+              sysfs_path: p.to_string(),
+              name
+            });
+          }
+        }
+      }
     }
 
     res
@@ -285,6 +333,54 @@ fn extract_input_devices_from_proc_bus_input_devices(
                 }
             }
         }
+      }
+      
+      let key_set = parse_mask_hex(&line[7..]).unwrap_or(HashSet::new());
+      
+      let ev_set = match &*working_ev_mask {
+        None => HashSet::new(),
+        Some(mask_hex) => {
+          parse_mask_hex(mask_hex.as_str()).unwrap_or(HashSet::new())
+        }
+      };
+      
+      let num_normal_keys = 
+          (key_set.contains(&(KeyCode::A as i32)) as i32)
+        + (key_set.contains(&(KeyCode::B as i32)) as i32)
+        + (key_set.contains(&(KeyCode::C as i32)) as i32)
+        + (key_set.contains(&(KeyCode::SPACE as i32)) as i32)
+        + (key_set.contains(&(KeyCode::LEFTSHIFT as i32)) as i32)
+        + (key_set.contains(&(KeyCode::RIGHTSHIFT as i32)) as i32)
+        + (key_set.contains(&(KeyCode::BACKSPACE as i32)) as i32)
+        + (key_set.contains(&(KeyCode::ENTER as i32)) as i32)
+        + (key_set.contains(&(KeyCode::ESC as i32)) as i32)
+        + (key_set.contains(&(KeyCode::PAUSE as i32)) as i32)
+        ;
+      
+      let name = match &*working_name {
+        None => "".to_string(),
+        Some(name) => name.clone()
+      };
+      
+      let has_scroll_down = key_set.contains(&(KeyCode::SCROLLDOWN as i32));
+      let lacks_leds = !ev_set.contains(&0x11);
+      let has_mouse_in_name = name.contains("Mouse");
+      let is_cros_ec = name == "cros_ec";
+      
+      let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
+      
+      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && !mousey && !is_cros_ec;
+      
+      match &*working_sysfs_path {
+        None => (),
+        Some(p) => {
+          res.push(ExtractedProcBusInputDevice {
+            sysfs_path: p.to_string(),
+            name,
+            is_keyboard
+          });
+        }
+      }
     }
 
     res
