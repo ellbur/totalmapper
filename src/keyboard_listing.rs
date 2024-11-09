@@ -133,8 +133,6 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
       
       let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
       
-      let has_rel_motion = ev_set.contains(&0x2);
-      
       let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
       
       if verbose {
@@ -142,7 +140,7 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
       }
       
       // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && (!has_rel_motion || has_keyboard_in_name) && !mousey && !is_cros_ec {
+      if num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec {
         match &*working_sysfs_path {
           None => (),
           Some(p) => {
@@ -157,7 +155,6 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
         if verbose {
           if !(num_keys >= 20) { println!("It is not because it has too few keys") }
           if !(num_normal_keys >= 3) { println!("It is not because it has too few normal keys") }
-          if !(!has_rel_motion || has_keyboard_in_name) { println!("It is not because it has relative motion like a mouse") }
           if !(!mousey) { println!("It is not because it looks like a mouse") }
           if !(!is_cros_ec) { println!("It is not because it's the ChromeOS embedded controller") }
         }
@@ -246,11 +243,9 @@ fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &st
       
       let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
       
-      let has_rel_motion = ev_set.contains(&0x2);
-      
       let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
       
-      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && (!has_rel_motion || has_keyboard_in_name) && !mousey && !is_cros_ec;
+      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec;
       
       match &*working_sysfs_path {
         None => (),
