@@ -27,6 +27,7 @@ mod example_hardware;
 mod layout_parsing_formatting;
 mod char_production_map;
 mod physical_keyboard_layouts;
+mod complete_tests;
 
 use clap::{Arg, App};
 use keys::Layout;
