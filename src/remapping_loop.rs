@@ -211,6 +211,9 @@ fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, e
             eprintln!("Skipping {} because could not c-strify path", s);
           },
           Some(l) => {
+            // For some reason canonicalize on some platforms doesn't do this
+            let l = l.replace("//", "/");
+
             if let Some(dev) = canonical_set.get(&l.to_string()) {
               if skip_non_keyboard && !dev.extracted_keyboard.is_keyboard {
                 if verbose { eprintln!("Skipping {} ({}) ({}) because it does not appear to be a keyboard", s, l, dev.extracted_keyboard.name); }
