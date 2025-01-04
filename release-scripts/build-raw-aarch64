@@ -1,4 +1,4 @@
-#!/usr/bin/rakudo
+#!/usr/bin/env rakudo
 
 # vim: ft=perl6
 
