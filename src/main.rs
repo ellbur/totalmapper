@@ -283,7 +283,15 @@ fn main() {
         std::process::exit(1);
       },
       Some(layout) => {
-        println!("{}", layout)
+        if m.is_present("plain") {
+          let json_value: serde_json::Value = serde_json::from_str(layout).unwrap();
+          let fancy_layout = layout_parsing_formatting::parse_layout_from_json(&json_value).unwrap();
+          let plain_layout = fancy_layout_interpreting::convert(&fancy_layout).unwrap();
+          let plain_json = serde_json::to_string_pretty(&plain_layout).unwrap();
+          println!("{}", plain_json);
+        } else {
+          println!("{}", layout)
+        }
       }
     }
   }
