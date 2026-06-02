@@ -9,16 +9,34 @@ use std::collections::HashSet;
 use crate::key_codes::KeyCode;
 
 pub fn list_keyboards_to_stdout(verbose: bool) -> io::Result<()> {
-  for p in list_keyboards(verbose)? {
+  let (keyboards, excluded) = list_keyboards_and_excluded(verbose)?;
+
+  let printed_any_keyboard = !keyboards.is_empty();
+  for p in keyboards {
     println!("{}: {}", p.name, p.dev_path.to_string_lossy());
   }
-  
+
+  if !excluded.is_empty() {
+    if printed_any_keyboard {
+      println!();
+    }
+    println!("Excluded keyboard-like devices:");
+    for d in excluded {
+      println!("  {}: {}", d.name, d.reason);
+    }
+  }
+
   Ok(())
 }
 
 struct ExtractedProcBusKeyboard {
   sysfs_path: String,
   name: String
+}
+
+pub struct ExcludedKeyboardLikeDevice {
+  pub name: String,
+  pub reason: String,
 }
 
 struct ExtractedProcBusInputDevice {
@@ -113,8 +131,9 @@ fn describe_signature_keys(key_set: &HashSet<i32>) -> String {
   if present.is_empty() { "none".to_string() } else { present.join(" ") }
 }
 
-fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> Vec<ExtractedProcBusKeyboard> {
+fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> (Vec<ExtractedProcBusKeyboard>, Vec<ExcludedKeyboardLikeDevice>) {
   let mut res = Vec::new();
+  let mut excluded = Vec::new();
   let lines = proc_bus_input_devices.split('\n');
 
   let mut working_sysfs_path = Box::new(None);
@@ -207,18 +226,40 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
       }
 
       // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec && !is_sec_key {
-        match &*working_sysfs_path {
-          None => (),
-          Some(p) => {
-            res.push(ExtractedProcBusKeyboard {
-              sysfs_path: p.to_string(),
-              name
-            });
-          }
+      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec && !is_sec_key;
+
+      if is_keyboard {
+        if let Some(p) = &*working_sysfs_path {
+          res.push(ExtractedProcBusKeyboard {
+            sysfs_path: p.to_string(),
+            name: name.clone(),
+          });
         }
       }
       else {
+        // Reasons listed most-specific first so the message a user sees is the
+        // most informative one if several checks would fail.
+        let reason: Option<&'static str> =
+          if is_sec_key { Some("name matches a known hardware security key") }
+          else if is_cros_ec { Some("ChromeOS embedded controller") }
+          else if mousey && !has_keyboard_in_name { Some("device profile looks more like a mouse than a keyboard") }
+          else if num_normal_keys < 3 { Some("too few common typing keys") }
+          else if num_keys < 20 { Some("too few total keys") }
+          else { None };
+
+        // "Keyboard-like" enough to be worth telling the user about. Pure
+        // mice, touchpads, lid switches, etc. don't appear in the excluded
+        // list; only things that could plausibly be confused for a keyboard.
+        let is_keyboard_like = has_keyboard_in_name || is_sec_key || num_normal_keys >= 1;
+        if is_keyboard_like {
+          if let Some(reason) = reason {
+            excluded.push(ExcludedKeyboardLikeDevice {
+              name: name.clone(),
+              reason: reason.to_string(),
+            });
+          }
+        }
+
         if verbose {
           if !(num_keys >= 20) { println!("It is not because it has too few keys") }
           if !(num_normal_keys >= 3) { println!("It is not because it has too few normal keys") }
@@ -232,8 +273,8 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
       }
     }
   }
-  
-  res
+
+  (res, excluded)
 }
 
 fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &str) -> Vec<ExtractedProcBusInputDevice> {
@@ -332,11 +373,15 @@ fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &st
 }
 
 pub fn list_keyboards(verbose: bool) -> io::Result<Vec<ExtractedKeyboard>> {
+  Ok(list_keyboards_and_excluded(verbose)?.0)
+}
+
+pub fn list_keyboards_and_excluded(verbose: bool) -> io::Result<(Vec<ExtractedKeyboard>, Vec<ExcludedKeyboardLikeDevice>)> {
   let mut res = Vec::new();
-  
+
   let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
-  let extracted = extract_keyboards_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
-  
+  let (extracted, excluded) = extract_keyboards_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
+
   if verbose {
     println!("Found from /proc/bus/input/devices:");
     for dev in &extracted {
@@ -344,7 +389,7 @@ pub fn list_keyboards(verbose: bool) -> io::Result<Vec<ExtractedKeyboard>> {
     }
     println!("");
   }
-  
+
   for dev in extracted {
     if verbose {
       println!("Inspecting {}", dev.name);
@@ -372,8 +417,8 @@ pub fn list_keyboards(verbose: bool) -> io::Result<Vec<ExtractedKeyboard>> {
       println!("");
     }
   }
-  
-  Ok(res)
+
+  Ok((res, excluded))
 }
 
 pub fn list_input_devices() -> io::Result<Vec<ExtractedInputDevice>> {
@@ -488,17 +533,27 @@ mod tests {
   #[test]
   fn test_security_key_exclusion() {
     let text = example_hardware::SECURITY_KEYS_ONLY;
-    let keyboards = extract_keyboards_from_proc_bus_input_devices(text, false);
+    let (keyboards, excluded) = extract_keyboards_from_proc_bus_input_devices(text, false);
     assert!(keyboards.is_empty(),
       "Expected no keyboards, but found: {:?}",
       keyboards.iter().map(|k| &k.name).collect::<Vec<_>>());
+
+    let excluded_names: Vec<&str> = excluded.iter().map(|d| d.name.as_str()).collect();
+    assert!(excluded_names.contains(&"CRYPTOTRUST ONLYKEY"),
+      "Expected ONLYKEY in excluded list, got: {:?}", excluded_names);
+    assert!(excluded_names.contains(&"Yubico YubiKey OTP+FIDO+CCID"),
+      "Expected YubiKey in excluded list, got: {:?}", excluded_names);
+    for d in &excluded {
+      assert!(d.reason.contains("security key"),
+        "Expected security-key reason, got: {:?}", d.reason);
+    }
   }
 
   #[test]
   fn test_gaming_mouse_exclusion() {
     let text = example_hardware::GAMING_MOUSE_SETUP_1;
-    
-    let keyoards = extract_keyboards_from_proc_bus_input_devices(text, false);
+
+    let (keyoards, _excluded) = extract_keyboards_from_proc_bus_input_devices(text, false);
     
     println!("Found:");
     for keyboard in &keyoards {
