@@ -1,9 +1,18 @@
 
 [package]
 name = "totalmapper"
-version = "1.1.0"
-authors = ["Owen Healy <owen@owenehealy.com.com>"]
+version = "1.4.8"
+authors = ["Owen Healy <owen@owenehealy.com>"]
 edition = "2018"
+description = "Remaps keycodes in the Linux input event system based on a simple, JSON-defined list of mappings."
+license = "MIT"
+
+[package.metadata.deb]
+section = "utils"
+priority = "optional"
+assets = [
+  ["target/release/totalmapper", "usr/bin/", "755"],
+]
 
 [dependencies]
 nix = "0.19.0"

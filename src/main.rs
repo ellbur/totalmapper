@@ -17,7 +17,6 @@ mod remapping_loop;
 mod keyboard_listing;
 mod udev_utils;
 mod layout_loading;
-mod version;
 mod monitor;
 mod monitor_raw;
 mod struct_de;
@@ -35,7 +34,7 @@ use keys::Layout;
 fn main() {
   let mut app =
     App::new("totalmapper")
-      .version(version::VERSION)
+      .version(env!("CARGO_PKG_VERSION"))
       .author("Owen Healy <owen@owenehealy.com>")
       .about("Remaps keycodes in the Linux input event system based on a simple, JSON-defined list of mappings.\n\
         \n\
