@@ -1,7 +1,7 @@
 
 [package]
 name = "totalmapper"
-version = "1.4.8"
+version = "1.5.0"
 authors = ["Owen Healy <owen@owenehealy.com>"]
 edition = "2018"
 description = "Remaps keycodes in the Linux input event system based on a simple, JSON-defined list of mappings."
