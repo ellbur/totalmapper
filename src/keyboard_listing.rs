@@ -58,19 +58,76 @@ fn parse_mask_hex(hex: &str) -> Result<HashSet<i32>, ParseIntError> {
   Ok(res)
 }
 
+fn is_security_key(name: &str) -> bool {
+  // Hardware security keys (YubiKey, OnlyKey, Nitrokey, etc.) present
+  // themselves as USB HID keyboards so they can type OTPs/passwords.
+  // They are indistinguishable from real keyboards by capability, so we
+  // exclude them by well-known product-name substrings.
+  let lower = name.to_lowercase();
+
+  // If the name says "keyboard", treat it as a keyboard regardless. This
+  // protects an obscure keyboard branded with e.g. FIDO support from being
+  // falsely excluded.
+  if lower.contains("keyboard") {
+    return false;
+  }
+
+  // Also require "key" (as in "security key") in the name; otherwise the
+  // generic patterns below (fido, u2f, ...) are too easy to false-positive
+  // against unrelated devices.
+  if !lower.contains("key") {
+    return false;
+  }
+
+  [
+    "yubikey", "onlykey", "nitrokey", "solokey",
+    "fido", "u2f", "webauthn",
+    "titan security", "hyperfido", "feitian epass",
+  ].iter().any(|p| lower.contains(p))
+}
+
+fn describe_ev_bits(ev_set: &HashSet<i32>) -> String {
+  // /usr/include/linux/input-event-codes.h
+  let names: &[(i32, &str)] = &[
+    (0x00, "EV_SYN"), (0x01, "EV_KEY"), (0x02, "EV_REL"), (0x03, "EV_ABS"),
+    (0x04, "EV_MSC"), (0x05, "EV_SW"),  (0x11, "EV_LED"), (0x12, "EV_SND"),
+    (0x14, "EV_REP"), (0x15, "EV_FF"),  (0x16, "EV_PWR"), (0x17, "EV_FF_STATUS"),
+  ];
+  let present: Vec<&str> = names.iter().filter(|(b, _)| ev_set.contains(b)).map(|(_, n)| *n).collect();
+  if present.is_empty() { "none".to_string() } else { present.join(" ") }
+}
+
+fn describe_signature_keys(key_set: &HashSet<i32>) -> String {
+  let signature: &[(KeyCode, &str)] = &[
+    (KeyCode::CAPSLOCK, "CAPSLOCK"),
+    (KeyCode::NUMLOCK, "NUMLOCK"),
+    (KeyCode::SCROLLLOCK, "SCROLLLOCK"),
+    (KeyCode::F1, "F1"),
+    (KeyCode::F12, "F12"),
+    (KeyCode::LEFTCTRL, "LEFTCTRL"),
+    (KeyCode::LEFTALT, "LEFTALT"),
+    (KeyCode::LEFTMETA, "LEFTMETA"),
+    (KeyCode::TAB, "TAB"),
+  ];
+  let present: Vec<&str> = signature.iter().filter(|(k, _)| key_set.contains(&(*k as i32))).map(|(_, n)| *n).collect();
+  if present.is_empty() { "none".to_string() } else { present.join(" ") }
+}
+
 fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> Vec<ExtractedProcBusKeyboard> {
   let mut res = Vec::new();
   let lines = proc_bus_input_devices.split('\n');
-  
+
   let mut working_sysfs_path = Box::new(None);
   let mut working_name = Box::new(None);
   let mut working_ev_mask = Box::new(None);
-  
+  let mut working_id_line: Box<Option<String>> = Box::new(None);
+
   for line in lines {
     if line.starts_with("I:") {
       *working_sysfs_path = None;
       *working_name = None;
       *working_ev_mask = None;
+      *working_id_line = Some(line[2..].trim().to_string());
     }
     else if line.starts_with("S: Sysfs=") {
       let new_sysfs_path = line[9..].to_string();
@@ -134,13 +191,23 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
       let mousey = (has_scroll_down as i32) + (lacks_leds as i32) + (has_mouse_in_name as i32) >= 2;
       
       let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
-      
+      let is_sec_key = is_security_key(&name);
+
       if verbose {
         println!("Testing if {} is keyboard-like", name);
+        if let Some(id) = &*working_id_line {
+          println!("  I: {}", id);
+        }
+        println!("  EV mask: {} ({})", working_ev_mask.as_ref().clone().unwrap_or_default(), describe_ev_bits(&ev_set));
+        println!("  KEY mask total keys: {}, normal keys: {}", num_keys, num_normal_keys);
+        println!("  Signature keys present: {}", describe_signature_keys(&key_set));
+        println!("  has_keyboard_in_name={}, is_cros_ec={}, is_security_key={}", has_keyboard_in_name, is_cros_ec, is_sec_key);
+        println!("  mousey={} (has_scroll_down={}, lacks_leds={}, has_mouse_in_name={})",
+          mousey, has_scroll_down, lacks_leds, has_mouse_in_name);
       }
-      
+
       // Heuristic for what is a keyboard
-      if num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec {
+      if num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec && !is_sec_key {
         match &*working_sysfs_path {
           None => (),
           Some(p) => {
@@ -157,6 +224,7 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
           if !(num_normal_keys >= 3) { println!("It is not because it has too few normal keys") }
           if !(!mousey) { println!("It is not because it looks like a mouse") }
           if !(!is_cros_ec) { println!("It is not because it's the ChromeOS embedded controller") }
+          if !(!is_sec_key) { println!("It is not because the name looks like a hardware security key") }
         }
       }
       if verbose {
@@ -245,7 +313,7 @@ fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &st
       
       let has_keyboard_in_name = name.to_lowercase().contains("keyboard");
       
-      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec;
+      let is_keyboard = num_keys >= 20 && num_normal_keys >= 3 && (has_keyboard_in_name || !mousey) && !is_cros_ec && !is_security_key(&name);
       
       match &*working_sysfs_path {
         None => (),
@@ -399,6 +467,33 @@ mod tests {
     assert!(res.contains(&64));
   }
   
+  #[test]
+  fn test_is_security_key_name_check() {
+    // Real security keys
+    assert!(is_security_key("Yubico YubiKey OTP+FIDO+CCID"));
+    assert!(is_security_key("CRYPTOTRUST ONLYKEY"));
+    assert!(is_security_key("Nitrokey Pro"));
+    assert!(is_security_key("Titan Security Key"));
+    // Hypothetical obscure keyboard branded with a security feature — must
+    // NOT be flagged, because "keyboard" in the name overrides.
+    assert!(!is_security_key("FIDO USB Keyboard"));
+    assert!(!is_security_key("U2F Backed Keyboard"));
+    // Even when "key" is also explicitly present, "keyboard" still wins.
+    assert!(!is_security_key("FIDO Security Key Keyboard"));
+    // Real keyboards
+    assert!(!is_security_key("AT Translated Set 2 keyboard"));
+    assert!(!is_security_key("Logitech K810"));
+  }
+
+  #[test]
+  fn test_security_key_exclusion() {
+    let text = example_hardware::SECURITY_KEYS_ONLY;
+    let keyboards = extract_keyboards_from_proc_bus_input_devices(text, false);
+    assert!(keyboards.is_empty(),
+      "Expected no keyboards, but found: {:?}",
+      keyboards.iter().map(|k| &k.name).collect::<Vec<_>>());
+  }
+
   #[test]
   fn test_gaming_mouse_exclusion() {
     let text = example_hardware::GAMING_MOUSE_SETUP_1;

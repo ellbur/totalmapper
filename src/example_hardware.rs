@@ -255,10 +255,36 @@ N: Name="TaoTronics TT-BH22 (AVRCP)"
 P: Phys=e0:2b:e9:ef:f7:30
 S: Sysfs=/devices/virtual/input/input33
 U: Uniq=
-H: Handlers=kbd event24 
+H: Handlers=kbd event24
 B: PROP=0
 B: EV=100007
 B: KEY=2fc800 145200000000 0 10300 49e800000c00 e16800000000f f810000010000ffc
 B: REL=0
+"#;
+
+#[cfg(test)]
+pub const SECURITY_KEYS_ONLY: &'static str = r#"I: Bus=0003 Vendor=1d50 Product=60fc Version=0111
+N: Name="CRYPTOTRUST ONLYKEY"
+P: Phys=usb-0000:00:0d.0-1/input0
+S: Sysfs=/devices/pci0000:00/0000:00:0d.0/usb1/1-1/1-1:1.0/0003:1D50:60FC.0001/input/input0
+U: Uniq=1000000000
+H: Handlers=kbd event0
+B: PROP=0
+B: EV=120013
+B: KEY=7 ff800000000007ff e0b2ffdf01cfffff fffffffffffffffe
+B: MSC=10
+B: LED=1f
+
+I: Bus=0003 Vendor=1050 Product=0407 Version=0110
+N: Name="Yubico YubiKey OTP+FIDO+CCID"
+P: Phys=usb-0000:00:0d.0-2/input0
+S: Sysfs=/devices/pci0000:00/0000:00:0d.0/usb1/1-2/1-2:1.0/0003:1050:0407.0004/input/input1
+U: Uniq=
+H: Handlers=kbd event1
+B: PROP=0
+B: EV=120013
+B: KEY=e080ffdf01cfffff fffffffffffffffe
+B: MSC=10
+B: LED=1f
 "#;
 
