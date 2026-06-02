@@ -3,10 +3,7 @@ use std::fmt::Display;
 
 // vim: shiftwidth=2
  
-pub use crate::key_codes::KeyCode; 
-pub use crate::events::Event;
-pub use Event::Pressed;
-pub use Event::Released;
+pub use crate::key_codes::KeyCode;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Layout {

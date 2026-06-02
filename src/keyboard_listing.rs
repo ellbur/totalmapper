@@ -168,7 +168,7 @@ fn extract_keyboards_from_proc_bus_input_devices(proc_bus_input_devices: &str, v
   res
 }
 
-fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &str, verbose: bool) -> Vec<ExtractedProcBusInputDevice> {
+fn extract_input_devices_from_proc_bus_input_devices(proc_bus_input_devices: &str) -> Vec<ExtractedProcBusInputDevice> {
   let mut res = Vec::new();
   let lines = proc_bus_input_devices.split('\n');
   
@@ -308,11 +308,11 @@ pub fn list_keyboards(verbose: bool) -> io::Result<Vec<ExtractedKeyboard>> {
   Ok(res)
 }
 
-pub fn list_input_devices(verbose: bool) -> io::Result<Vec<ExtractedInputDevice>> {
+pub fn list_input_devices() -> io::Result<Vec<ExtractedInputDevice>> {
   let mut res = Vec::new();
   
   let proc_bus_input_devices = read_to_string("/proc/bus/input/devices")?;
-  let extracted = extract_input_devices_from_proc_bus_input_devices(&proc_bus_input_devices, verbose);
+  let extracted = extract_input_devices_from_proc_bus_input_devices(&proc_bus_input_devices);
   
   for dev in extracted {
     let p = dev.sysfs_path;

@@ -164,7 +164,7 @@ fn filter_devices_verbose<'s>(devices: &Vec<&'s str>, skip_non_keyboard: bool, e
   use std::fs::canonicalize;
   let mut res = Vec::new();
   
-  let all_input_devices = list_input_devices(verbose)
+  let all_input_devices = list_input_devices()
     .map_err(|e| format!("Failed to get the list of keyboards: {}", e))?;
   
   if verbose {

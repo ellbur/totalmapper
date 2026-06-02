@@ -4,7 +4,7 @@ mod tests {
   use crate::fancy_layout_interpreting::convert;
   use crate::layout_parsing_formatting::parse_layout_from_json;
   use crate::key_transforms::Mapper;
-  use crate::keys::Event::{Pressed, Released};
+  use crate::keys::Event::Pressed;
   use crate::keys::KeyCode::*;
 
   #[test]
