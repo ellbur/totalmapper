@@ -134,15 +134,17 @@ mod tests {
     let restringed2 = formatted.to_string();
 
     if restringed1 != restringed2 {
-      let changes = difference::Changeset::new(&restringed1, &restringed2, "");
+      use colored::Colorize;
+      use similar::{ChangeTag, TextDiff};
+      let diff = TextDiff::from_chars(&restringed1, &restringed2);
 
-      for d in changes.diffs {
-        use colored::Colorize;
+      for change in diff.iter_all_changes() {
+        let s = change.value();
         print!("{}",
-          match d {
-            difference::Difference::Same(t) => t.normal(),
-            difference::Difference::Add(t) => t.green(),
-            difference::Difference::Rem(t) => t.red()
+          match change.tag() {
+            ChangeTag::Equal => s.normal(),
+            ChangeTag::Insert => s.green(),
+            ChangeTag::Delete => s.red(),
           }
         );
       }

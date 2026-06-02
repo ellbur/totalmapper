@@ -1,8 +1,5 @@
- 
+
 // vim: shiftwidth=2
- 
-#[macro_use]
-extern crate enum_display_derive;
 
 mod key_codes;
 mod events;
@@ -28,12 +25,12 @@ mod char_production_map;
 mod physical_keyboard_layouts;
 mod complete_tests;
 
-use clap::{Arg, App};
+use clap::{Arg, ArgAction, Command};
 use keys::Layout;
 
 fn main() {
   let mut app =
-    App::new("totalmapper")
+    Command::new("totalmapper")
       .version(env!("CARGO_PKG_VERSION"))
       .author("Owen Healy <owen@owenehealy.com>")
       .about("Remaps keycodes in the Linux input event system based on a simple, JSON-defined list of mappings.\n\
@@ -49,77 +46,76 @@ fn main() {
             totalmapper print_default_layout caps-for-movement\n\
         \n\
         More documentation is available at https://github.com/ellbur/totalmapper")
-      .subcommand(App::new("remap")
+      .subcommand(Command::new("remap")
         .about("Remap a keyboard")
         .arg(Arg::new("dev_file")
           .long("dev-file")
-          .takes_value(true)
           .value_name("FILE")
-          .multiple_occurrences(true)
-          .number_of_values(1)
-          .help_heading(Some("DEVICE SELECTION"))
+          .action(ArgAction::Append)
+          .help_heading("DEVICE SELECTION")
           .help("A path under /dev/input representing a keyboard device. To find your keyboards, run `totalmapper list_keyboards`. Repeat this option multiple times to map multiple keyboards, e.g., `totalmapper remap --dev-file /dev/input/event0 --dev-file /dev/input/event1`. Use --all-keyboards to map all keyboards currently plugged in.")
         )
         .arg(Arg::new("all_keyboards")
           .long("all-keyboards")
-          .help_heading(Some("DEVICE SELECTION"))
+          .action(ArgAction::SetTrue)
+          .help_heading("DEVICE SELECTION")
           .help("Remap all keyboards currently plugged in. Note that this will not affect keyboards you plug in after invoking this command. To automatically remap new keyboards, see --auto-all-keyboards or the command `totalmapper add_udev_rule`.")
         )
         .arg(Arg::new("auto_all_keyboards")
           .long("auto-all-keyboards")
-          .help_heading(Some("DEVICE SELECTION"))
+          .action(ArgAction::SetTrue)
+          .help_heading("DEVICE SELECTION")
           .help("Automatically remap keyboards as they are plugged in. Useful on systems that don't use systemd.")
         )
         .arg(Arg::new("default_layout")
           .long("default-layout")
-          .takes_value(true)
           .value_name("NAME")
-          .help_heading(Some("LAYOUT SELECTION"))
+          .help_heading("LAYOUT SELECTION")
           .help("Use the builtin layout named NAME. To list the builtin layouts, use `totalmapper list_default_layouts`. To get the JSON for a default layout, use `totalmapper print_default_layout <name>`.")
         )
         .arg(Arg::new("layout_file")
           .long("layout-file")
-          .takes_value(true)
           .value_name("FILE")
-          .help_heading(Some("LAYOUT SELECTION"))
+          .help_heading("LAYOUT SELECTION")
           .help("Load a layout from json file FILE. To see an example of the form, print an example using `totalmapper print_default_layout caps-for-movement`.")
         )
         .arg(Arg::new("only_if_keyboard")
           .long("only-if-keyboard")
-          .help_heading(Some("PROCESS"))
+          .action(ArgAction::SetTrue)
+          .help_heading("PROCESS")
           .help("If the device selected with --dev-file is not a keyboard, exit successfully. Useful when running from udev, since there is no easy way to test in a udev rule whether an input device is a keyboard.")
         )
         .arg(Arg::new("exclude")
           .long("exclude")
-          .takes_value(true)
           .value_name("PATTERN")
-          .multiple_occurrences(true)
-          .help_heading(Some("DEVICE SELECTION"))
+          .action(ArgAction::Append)
+          .help_heading("DEVICE SELECTION")
           .help("Don't apply to keyboards with names matching glob-style pattern. To see the names of currently connected keyboards, run `totalmapper list_keyboards`; the part before the ':' is the name. Repeat this option to exclude multiple patterns. Useful when running from udev.")
         )
         .arg(Arg::new("tablet_mode_switch_device")
           .long("tablet-mode-switch-device")
-          .takes_value(true)
           .value_name("FILE")
-          .help_heading(Some("TABLET MODE"))
+          .help_heading("TABLET MODE")
           .help("Do not emit key events when the selected device indicates the computer is in tablet mode.")
         )
         .arg(Arg::new("verbose")
           .long("verbose")
-          .help_heading(Some("DEBUGGING"))
+          .action(ArgAction::SetTrue)
+          .help_heading("DEBUGGING")
           .help("Print verbose info.")
         )
       )
-      .subcommand(App::new("list_keyboards")
+      .subcommand(Command::new("list_keyboards")
         .about("List keyboard devices under /dev/input")
         .arg(Arg::new("verbose")
           .long("verbose")
+          .action(ArgAction::SetTrue)
         )
       )
-      .subcommand(App::new("list_default_layouts")
+      .subcommand(Command::new("list_default_layouts")
         .about("List the names of the default layouts")
       )
-      .subcommand(App::new("print_default_layout")
+      .subcommand(Command::new("print_default_layout")
         .about("Print the JSON for one of the builtin layouts")
         .arg(Arg::new("NAME")
           .required(true)
@@ -128,81 +124,87 @@ fn main() {
         )
         .arg(Arg::new("plain")
           .long("plain")
+          .action(ArgAction::SetTrue)
           .help("Convert the layout to the plain format before printing. The plain format expands aliases and row mappings into individual key mappings.")
         )
       )
-      .subcommand(App::new("monitor")
+      .subcommand(Command::new("monitor")
         .about("Print events from a keyboard device (without consuming them)")
         .arg(Arg::new("dev_file")
           .long("dev-file")
-          .takes_value(true)
           .value_name("FILE")
-          .number_of_values(1)
           .help("A path under /dev/input representing a keyboard device. To find your keyboards, run `totalmapper list_keyboards`.")
         )
       )
-      .subcommand(App::new("monitor_raw")
+      .subcommand(Command::new("monitor_raw")
         .about("Print all events from any input device (without consuming them).")
         .arg(Arg::new("dev_file")
           .long("dev-file")
-          .takes_value(true)
           .value_name("FILE")
-          .number_of_values(1)
           .help("A path under /dev/input")
         )
       )
-      .subcommand(App::new("monitor_tablet_mode")
+      .subcommand(Command::new("monitor_tablet_mode")
         .about("Monitor a table mode switch device.")
         .arg(Arg::new("dev_file")
           .long("dev-file")
-          .takes_value(true)
           .value_name("FILE")
-          .number_of_values(1)
           .help("A path under /dev/input representing your tablet mode switch")
         )
       )
-      .subcommand(App::new("add_systemd_service")
+      .subcommand(Command::new("add_systemd_service")
         .about("Add (or update, if one exists) a rule in /etc/udev/rules.d/ and service in /etc/systemd/system/ to start totalmapper when a new keyboard is plugged in. Add --and-start option to also start it for keyboards already plugged in. Must be run as root.")
         .arg(Arg::new("default_layout")
           .long("default-layout")
-          .takes_value(true)
           .value_name("NAME")
-          .help_heading(Some("LAYOUT SELECTION"))
+          .help_heading("LAYOUT SELECTION")
           .help("Use the builtin layout named NAME. To list the builtin layouts, use `totalmapper list_default_layouts`. To get the JSON for a default layout, use `totalmapper print_default_layout <name>`.")
         )
         .arg(Arg::new("layout_file")
           .long("layout-file")
-          .takes_value(true)
           .value_name("FILE")
-          .help_heading(Some("LAYOUT SELECTION"))
+          .help_heading("LAYOUT SELECTION")
           .help("Load a layout from json file FILE. To see an example of the form, print an example using `totalmapper print_default_layout caps-for-movement`.")
         )
         .arg(Arg::new("and_start")
           .long("and-start")
-          .help_heading(Some("RUNNING"))
+          .action(ArgAction::SetTrue)
+          .help_heading("RUNNING")
           .help("Also start the service for all existing keyboards")
         )
         .arg(Arg::new("exclude")
           .long("exclude")
-          .takes_value(true)
           .value_name("PATTERN")
-          .multiple_occurrences(true)
-          .help_heading(Some("DEVICE SELECTION"))
+          .action(ArgAction::Append)
+          .help_heading("DEVICE SELECTION")
           .help("Don't apply to keyboards with names matching glob-style pattern. To see the names of currently connected keyboards, run `totalmapper list_keyboards`; the part before the ':' is the name. Repeat this option to exclude multiple patterns.")
         )
       );
-      
+
   let m = app.clone().get_matches();
-  
+
   if let Some(m) = m.subcommand_matches("remap") {
-    let layout = load_layout(&m.value_of("default_layout"), &m.value_of("layout_file"));
+    let default_layout = m.get_one::<String>("default_layout").map(|s| s.as_str());
+    let layout_file = m.get_one::<String>("layout_file").map(|s| s.as_str());
+    let layout = load_layout(&default_layout, &layout_file);
     match layout {
       Err(msg) => {
         println!("{}", msg);
         std::process::exit(1);
       },
       Ok(layout) => {
-        match (m.occurrences_of("all_keyboards") > 0, m.values_of("dev_file"), m.occurrences_of("auto_all_keyboards") > 0) {
+        let dev_files: Option<Vec<&str>> = m.get_many::<String>("dev_file")
+          .map(|vals| vals.map(|s| s.as_str()).collect());
+        let all_keyboards = m.get_flag("all_keyboards");
+        let auto_all_keyboards = m.get_flag("auto_all_keyboards");
+        let verbose = m.get_flag("verbose");
+        let only_if_keyboard = m.get_flag("only_if_keyboard");
+        let excludes: Vec<&str> = m.get_many::<String>("exclude")
+          .map(|vals| vals.map(|s| s.as_str()).collect())
+          .unwrap_or_default();
+        let tablet_mode_switch_device = m.get_one::<String>("tablet_mode_switch_device").map(|s| s.as_str());
+
+        match (all_keyboards, dev_files.as_ref(), auto_all_keyboards) {
           (false, None, false) => {
             println!("Error: Must specify a least one --dev-file or --all-keyboards");
           },
@@ -216,11 +218,7 @@ fn main() {
             println!("Error: Must specify either --dev-file, --all-keyboards, or --auto-all-keyboards, not both");
           },
           (true, _, _) => {
-            let excludes: Vec<&str> = match m.values_of("exclude") {
-              None => vec![],
-              Some(excludes) => excludes.collect()
-            };
-            match remapping_loop::do_remapping_loop_all_devices(&layout, &excludes, m.occurrences_of("verbose") > 0) {
+            match remapping_loop::do_remapping_loop_all_devices(&layout, &excludes, verbose) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
@@ -229,18 +227,13 @@ fn main() {
             }
           },
           (_, Some(devs), _) => {
-            let devs2 = devs.collect();
-            let excludes: Vec<&str> = match m.values_of("exclude") {
-              None => vec![],
-              Some(excludes) => excludes.collect()
-            };
             match remapping_loop::do_remapping_loop_multiple_devices(
-                &devs2,
-                m.occurrences_of("only_if_keyboard") > 0,
+                devs,
+                only_if_keyboard,
                 &excludes,
                 &layout,
-                &m.value_of("tablet_mode_switch_device"),
-                m.occurrences_of("verbose") > 0)
+                &tablet_mode_switch_device,
+                verbose)
             {
               Ok(_) => (),
               Err(err) => {
@@ -250,11 +243,7 @@ fn main() {
             }
           },
           (_, _, true) => {
-            let excludes: Vec<&str> = match m.values_of("exclude") {
-              None => vec![],
-              Some(excludes) => excludes.collect()
-            };
-            match remapping_loop::do_remapping_loop_auto_all_devices(&layout, &excludes, m.occurrences_of("verbose") > 0) {
+            match remapping_loop::do_remapping_loop_auto_all_devices(&layout, &excludes, verbose) {
               Ok(_) => (),
               Err(err) => {
                 println!("Error: {}", err);
@@ -267,7 +256,7 @@ fn main() {
     }
   }
   else if let Some(m) = m.subcommand_matches("list_keyboards") {
-    keyboard_listing::list_keyboards_to_stdout(m.occurrences_of("verbose") > 0).unwrap();
+    keyboard_listing::list_keyboards_to_stdout(m.get_flag("verbose")).unwrap();
   }
   else if let Some(_) = m.subcommand_matches("list_default_layouts") {
     for name in (*default_fancy_layouts::DEFAULT_LAYOUTS).keys() {
@@ -275,14 +264,14 @@ fn main() {
     }
   }
   else if let Some(m) = m.subcommand_matches("print_default_layout") {
-    let name = m.value_of("NAME").unwrap();
+    let name = m.get_one::<String>("NAME").unwrap();
     match (*default_fancy_layouts::DEFAULT_LAYOUTS).get(name) {
       None => {
         println!("Error: no builtin layout named {}", name);
         std::process::exit(1);
       },
       Some(layout) => {
-        if m.is_present("plain") {
+        if m.get_flag("plain") {
           let json_value: serde_json::Value = serde_json::from_str(layout).unwrap();
           let fancy_layout = layout_parsing_formatting::parse_layout_from_json(&json_value).unwrap();
           let plain_layout = fancy_layout_interpreting::convert(&fancy_layout).unwrap();
@@ -295,7 +284,7 @@ fn main() {
     }
   }
   else if let Some(m) = m.subcommand_matches("monitor") {
-    match m.value_of("dev_file") {
+    match m.get_one::<String>("dev_file") {
       None => {
         println!("Must specify --dev-file");
       },
@@ -305,7 +294,7 @@ fn main() {
     }
   }
   else if let Some(m) = m.subcommand_matches("monitor_raw") {
-    match m.value_of("dev_file") {
+    match m.get_one::<String>("dev_file") {
       None => {
         println!("Must specify --dev-file");
       },
@@ -315,7 +304,7 @@ fn main() {
     }
   }
   else if let Some(m) = m.subcommand_matches("monitor_tablet_mode") {
-    match m.value_of("dev_file") {
+    match m.get_one::<String>("dev_file") {
       None => {
         println!("Must specify --dev-file");
       },
@@ -325,24 +314,25 @@ fn main() {
     }
   }
   else if let Some(m) = m.subcommand_matches("add_systemd_service") {
-    match load_layout(&m.value_of("default_layout"), &m.value_of("layout_file")) {
+    let default_layout = m.get_one::<String>("default_layout").map(|s| s.as_str());
+    let layout_file = m.get_one::<String>("layout_file").map(|s| s.as_str());
+    match load_layout(&default_layout, &layout_file) {
       Err(s) => {
         println!("{}", s);
         std::process::exit(1);
       },
       Ok(layout) => {
-        let excludes: Vec<&str> = match m.values_of("exclude") {
-          None => vec![],
-          Some(excludes) => excludes.collect()
-        };
-        
+        let excludes: Vec<&str> = m.get_many::<String>("exclude")
+          .map(|vals| vals.map(|s| s.as_str()).collect())
+          .unwrap_or_default();
+
         match udev_utils::add_systemd_service(&layout, excludes.into_iter()) {
           Err(msg) => {
             println!("{}", msg);
             std::process::exit(1);
           },
           Ok(_) => {
-            if m.occurrences_of("and_start") > 0 {
+            if m.get_flag("and_start") {
               match udev_utils::start_systemd_service() {
                 Err(msg) => {
                   println!("{}", msg);

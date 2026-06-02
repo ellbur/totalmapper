@@ -3,7 +3,7 @@ use mio::unix::SourceFd;
 use mio::{Events, Interest, Poll, Token};
 use nix::errno::Errno;
 // vim: shiftwidth=2
- 
+
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::Mode;
 use nix::unistd::{read, write};
@@ -12,7 +12,7 @@ use libc::input_event;
 use std::mem::size_of;
 use uinput_sys::{ui_set_evbit, EV_SYN, EV_KEY, EV_MSC, ui_dev_create, ui_set_keybit};
 use crate::struct_ser::StructSerializer;
-use std::os::unix::io::RawFd;
+use std::os::fd::{BorrowedFd, IntoRawFd, RawFd};
 use crate::keys::Event;
 use num_traits::FromPrimitive;
 use std::path::Path;
@@ -35,12 +35,12 @@ impl DevInputReader {
     loop {
       let size = size_of::<input_event>();
       let mut buf: Vec<u8> = vec![0; size];
-      read(self.fd, &mut buf)?;
-      
+      read(unsafe { BorrowedFd::borrow_raw(self.fd) }, &mut buf)?;
+
       let type_ = u16::from_ne_bytes([buf[16], buf[17]]);
       let code = u16::from_ne_bytes([buf[18], buf[19]]);
       let value = i32::from_ne_bytes([buf[20], buf[21], buf[22], buf[23]]);
-      
+
       if type_ == 1 && (value == 0 || value == 1) {
         match FromPrimitive::from_u16(code) {
           Some(k) => match value {
@@ -55,7 +55,7 @@ impl DevInputReader {
   }
   
   pub fn open(path: &Path, exclusion: Exclusion, nonblock: bool) -> Result<DevInputReader, Error> {
-    let fd = open(path, if nonblock {OFlag::O_RDONLY | OFlag::O_NONBLOCK} else {OFlag::O_RDONLY}, Mode::empty())?;
+    let fd = open(path, if nonblock {OFlag::O_RDONLY | OFlag::O_NONBLOCK} else {OFlag::O_RDONLY}, Mode::empty())?.into_raw_fd();
     
     match exclusion {
       Exclusion::NoExclusion => { },
@@ -110,31 +110,24 @@ fn do_exclusion_loop(fd: RawFd) -> Result<(), Error> {
 fn wait_for_any_activity(fd: RawFd) -> Result<(), Error> {
   let size = size_of::<input_event>();
   let mut buf: Vec<u8> = vec![0; size];
-  match read(fd, &mut buf) {
-    Err(e) => match e {
-      Error::Sys(code) => match code {
-        nix::errno::Errno::EAGAIN => {
-          let mut poll = Poll::new().unwrap();
-          poll.registry().register(&mut SourceFd(&fd), Token(0), Interest::READABLE).unwrap();
-          let mut events = Events::with_capacity(24);
-          match poll.poll(&mut events, None) {
-            Err(e) => {
-              return Err(Error::Sys(Errno::from_i32(e.raw_os_error().unwrap_or(0))));
-            },
-            Ok(_) => ()
-          };
+  match read(unsafe { BorrowedFd::borrow_raw(fd) }, &mut buf) {
+    Err(Errno::EAGAIN) => {
+      let mut poll = Poll::new().unwrap();
+      poll.registry().register(&mut SourceFd(&fd), Token(0), Interest::READABLE).unwrap();
+      let mut events = Events::with_capacity(24);
+      match poll.poll(&mut events, None) {
+        Err(e) => {
+          return Err(Errno::from_raw(e.raw_os_error().unwrap_or(0)));
         },
-        _ => {
-          return Err(e);
-        }
-      },
-      _ => {
-        return Err(e);
-      }
+        Ok(_) => ()
+      };
+    },
+    Err(e) => {
+      return Err(e);
     },
     Ok(_) => ()
   };
-  
+
   Ok(())
 }
 
@@ -144,7 +137,7 @@ pub struct DevInputWriter {
 
 impl DevInputWriter {
   pub fn open() -> Result<DevInputWriter, Error> {
-    let fdo = open("/dev/uinput", OFlag::O_WRONLY | OFlag::O_NONBLOCK, Mode::empty())?;
+    let fdo = open("/dev/uinput", OFlag::O_WRONLY | OFlag::O_NONBLOCK, Mode::empty())?.into_raw_fd();
 
     unsafe {
       ui_set_evbit(fdo, EV_SYN);
@@ -178,7 +171,7 @@ impl DevInputWriter {
       user_dev_data.add_i32_array(&[0; 64]);
       user_dev_data.add_i32_array(&[0; 64]);
       
-      write(fdo, &user_dev_data.sink).unwrap();
+      write(unsafe { BorrowedFd::borrow_raw(fdo) }, &user_dev_data.sink).unwrap();
     }
     
     unsafe { ui_dev_create(fdo); }
@@ -216,7 +209,7 @@ impl DevInputWriter {
     }
     send_type_code_value(0, 0, 0);
     
-    write(self.fd, &input_event_data.sink)?;
+    write(unsafe { BorrowedFd::borrow_raw(self.fd) }, &input_event_data.sink)?;
     
     Ok(())
   }

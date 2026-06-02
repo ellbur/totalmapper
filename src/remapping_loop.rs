@@ -2,7 +2,6 @@
 // vim: shiftwidth=2
 
 use crate::keys::Layout;
-use nix::Error;
 use nix::errno::Errno::ENODEV;
 use wildmatch::WildMatch;
 use crate::key_transforms;
@@ -62,7 +61,7 @@ struct WorkingChild {
 
 pub fn do_remapping_loop_auto_all_devices(layout: &Layout, excludes: &[&str], verbose: bool) -> Result<(), String> {
   let mut inotify = Inotify::init().expect("Error initializing");
-  inotify.add_watch("/dev/input", WatchMask::CREATE | WatchMask::ATTRIB)
+  inotify.watches().add("/dev/input", WatchMask::CREATE | WatchMask::ATTRIB)
     .expect("Failed to add watch");
 
   let mut children: Vec<WorkingChild> = Vec::new();
@@ -445,8 +444,8 @@ impl Driver for RealDriver {
   
   fn next_keyboard(&mut self) -> Result<Next<Event>, String> {
     match self.rw.r.next() {
-      Err(Error::Sys(EAGAIN)) => Ok(Next::Busy),
-      Err(Error::Sys(ENODEV)) => Ok(Next::End),
+      Err(EAGAIN) => Ok(Next::Busy),
+      Err(ENODEV) => Ok(Next::End),
       Err(e) => Err(format!("read() from keyboard failed with {}", e)),
       Ok(ev) => Ok(Next::One(ev))
     }
@@ -456,8 +455,8 @@ impl Driver for RealDriver {
     match &mut self.rw.t {
       Some(t) => {
         match t.next() {
-          Err(Error::Sys(EAGAIN)) => Ok(Next::Busy),
-          Err(Error::Sys(ENODEV)) => Ok(Next::End),
+          Err(EAGAIN) => Ok(Next::Busy),
+          Err(ENODEV) => Ok(Next::End),
           Err(e) => Err(format!("read() from tablet mode switch failed with {}", e)),
           Ok(ev) => Ok(Next::One(ev))
         }

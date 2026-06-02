@@ -3,7 +3,6 @@
 
 use crate::tablet_mode_switch_reader::TabletModeSwitchReader;
 use std::path::Path;
-use nix::Error::Sys;
 use nix::errno::Errno::ENODEV;
 
 pub fn run_monitor(dev_file: &str) {
@@ -23,7 +22,7 @@ fn run_monitor_err(dev_file: &str) -> Result<(), String> {
     match r.next() {
       Err(e) => {
         match e {
-          Sys(ENODEV) => return Ok(()),
+          ENODEV => return Ok(()),
           _ => return Err(format!("Failed to read from device: {}", e))
         }
       }

@@ -1,7 +1,7 @@
 
 // vim: shiftwidth=2
 
-use std::os::unix::io::RawFd;
+use std::os::fd::{BorrowedFd, IntoRawFd, RawFd};
 use std::path::Path;
 use nix::fcntl::{open, OFlag};
 use nix::Error;
@@ -21,7 +21,7 @@ pub enum TableModeEvent {
 
 impl TabletModeSwitchReader {
   pub fn open(path: &Path, nonblock: bool) -> Result<TabletModeSwitchReader, Error> {
-    let fd = open(path, if nonblock {OFlag::O_RDONLY | OFlag::O_NONBLOCK} else {OFlag::O_RDONLY}, Mode::empty())?;
+    let fd = open(path, if nonblock {OFlag::O_RDONLY | OFlag::O_NONBLOCK} else {OFlag::O_RDONLY}, Mode::empty())?.into_raw_fd();
     
     Ok(TabletModeSwitchReader {
       fd: fd
@@ -32,7 +32,7 @@ impl TabletModeSwitchReader {
     loop {
       let size = size_of::<input_event>();
       let mut buf: Vec<u8> = vec![0; size];
-      read(self.fd, &mut buf)?;
+      read(unsafe { BorrowedFd::borrow_raw(self.fd) }, &mut buf)?;
       
       let type_ = u16::from_ne_bytes([buf[16], buf[17]]);
       let code = u16::from_ne_bytes([buf[18], buf[19]]);
