@@ -21,11 +21,11 @@ It is more flexible than tools like `xmodmap` and `xkb` in that it lets you use 
 ## Packages
 
 * Ubuntu amd64:
-    * [`totalmapper_1.5.0-jammy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.5.0/totalmapper_1.5.0-jammy_amd64.deb)
-    * [`totalmapper_1.5.0-noble_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.5.0/totalmapper_1.5.0-noble_amd64.deb)
+    * [`totalmapper_1.6.0-jammy_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.6.0/totalmapper_1.6.0-jammy_amd64.deb)
+    * [`totalmapper_1.6.0-noble_amd64.deb`](https://github.com/ellbur/totalmapper/releases/download/v1.6.0/totalmapper_1.6.0-noble_amd64.deb)
 * Self-contained Linux binaries (useful for Chrome OS):
-    * [`totalmapper-static-linux-amd64-1.5.0.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.5.0/totalmapper-static-linux-amd64-1.5.0.tar.gz)
-    * [`totalmapper-static-linux-aarch64-1.5.0.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.5.0/totalmapper-static-linux-aarch64-1.5.0.tar.gz)
+    * [`totalmapper-static-linux-amd64-1.6.0.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.6.0/totalmapper-static-linux-amd64-1.6.0.tar.gz)
+    * [`totalmapper-static-linux-aarch64-1.6.0.tar.gz`](https://github.com/ellbur/totalmapper/releases/download/v1.6.0/totalmapper-static-linux-aarch64-1.6.0.tar.gz)
 
 ## From source
 
