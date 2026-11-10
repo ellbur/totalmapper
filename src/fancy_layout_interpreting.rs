@@ -61,7 +61,7 @@ fn adjust_repeats<'a>(res: &mut Vec<s::Mapping>, from_table: &HashMap<FromSet, V
           }
         }
         else {
-          res.push(s::Mapping { from: from.clone(), to: from, repeat, absorbing: vec![] });
+          res.push(s::Mapping { from: from.clone(), to: from, repeat, ..Default::default() });
         }
       }
     },
@@ -105,7 +105,7 @@ fn convert_alias(alias: &f::AliasMapping) -> Vec<s::Mapping> {
       from: alias.from.keys.clone(),
       to: alias.to.initial.clone(),
       repeat: s::Repeat::Normal,
-      absorbing: vec![]
+      ..Default::default()
     }]
   }
   else {
@@ -132,13 +132,14 @@ fn convert_single<'a>(alias_mappings: &'a HashMap<String, Vec<&'a f::AliasMappin
       }
     };
 
-    let absorbing = modifier_combination.reify_modifiers(&single.absorbing)?;
+    let absorbing = modifier_combination.reify_modifiers(&single.absorbing.modifiers)?;
 
     res.push(s::Mapping {
       from,
       to,
       repeat,
-      absorbing
+      absorbing,
+      absorbing_except_next: single.absorbing.except_next.clone()
     });
   }
   Ok(res)
@@ -214,13 +215,14 @@ fn convert_row<'t>(alias_mappings: &'t HashMap<String, Vec<&'t f::AliasMapping>>
           }
         };
 
-        let absorbing = modifier_combination.reify_modifiers(&row_mapping.absorbing)?;
+        let absorbing = modifier_combination.reify_modifiers(&row_mapping.absorbing.modifiers)?;
 
         res.push(s::Mapping {
           from,
           to,
           repeat,
-          absorbing
+          absorbing,
+          absorbing_except_next: row_mapping.absorbing.except_next.clone()
         });
       }
     }
@@ -536,16 +538,16 @@ use super::{multiply, convert_row_to, convert};
       from: SFK { modifiers: vec![Alias("@shift".o())], key: E },
       to: STK { initial: vec![Alias("@shift".o())], terminal: Physical(DOT) },
       repeat: f::SingleRepeat::Special { keys: STK { initial: vec![Key(LEFTCTRL)], terminal: Physical(K3) }, delay_ms: 50, interval_ms: 30 },
-      absorbing: vec![Alias("@shift".o())]
+      absorbing: f::Absorbing::modifiers(vec![Alias("@shift".o())])
     };
     
     let res = convert_single(&alias_mappings, &single).unwrap();
     assert_eq!(res.len(), 2);
     assert_eq!(res[0], 
-      s::Mapping { from: vec![LEFTSHIFT, E], to: vec![LEFTSHIFT, DOT], repeat: s::Repeat::Special { keys: vec![LEFTCTRL, K3], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LEFTSHIFT]  }
+      s::Mapping { from: vec![LEFTSHIFT, E], to: vec![LEFTSHIFT, DOT], repeat: s::Repeat::Special { keys: vec![LEFTCTRL, K3], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LEFTSHIFT], absorbing_except_next: vec![] }
     );
     assert_eq!(res[1],
-      s::Mapping { from: vec![RIGHTSHIFT, E], to: vec![RIGHTSHIFT, DOT], repeat: s::Repeat::Special { keys: vec![LEFTCTRL, K3], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RIGHTSHIFT]  }
+      s::Mapping { from: vec![RIGHTSHIFT, E], to: vec![RIGHTSHIFT, DOT], repeat: s::Repeat::Special { keys: vec![LEFTCTRL, K3], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RIGHTSHIFT], absorbing_except_next: vec![] }
     );
   }
   
@@ -563,7 +565,7 @@ use super::{multiply, convert_row_to, convert};
       from: RFK { modifiers: vec![Alias("@shift".o())], row: f::Row::USQuertyA },
       to: RTK { initial: vec![], terminal: "AOEU".o() },
       repeat: f::RowRepeat::Special { keys: RTK { initial: vec![], terminal: "aoeu".o() }, delay_ms: 50, interval_ms: 30 },
-      absorbing: vec![Alias("@shift".o())]
+      absorbing: f::Absorbing::modifiers(vec![Alias("@shift".o())])
     };
     
     use s::Repeat::Special as SRS;
@@ -575,15 +577,15 @@ use super::{multiply, convert_row_to, convert};
     let res = convert_row(&alias_mappings, &row).unwrap();
     assert_eq!(res.len(), 8);
     
-    assert_eq!(res[0], SM { from: vec![LS, A], to: vec![LS, A], repeat: SRS { keys: vec![A], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS]  });
-    assert_eq!(res[1], SM { from: vec![LS, S], to: vec![LS, O], repeat: SRS { keys: vec![O], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS]  });
-    assert_eq!(res[2], SM { from: vec![LS, D], to: vec![LS, E], repeat: SRS { keys: vec![E], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS]  });
-    assert_eq!(res[3], SM { from: vec![LS, F], to: vec![LS, U], repeat: SRS { keys: vec![U], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS]  });
+    assert_eq!(res[0], SM { from: vec![LS, A], to: vec![LS, A], repeat: SRS { keys: vec![A], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS], absorbing_except_next: vec![] });
+    assert_eq!(res[1], SM { from: vec![LS, S], to: vec![LS, O], repeat: SRS { keys: vec![O], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS], absorbing_except_next: vec![] });
+    assert_eq!(res[2], SM { from: vec![LS, D], to: vec![LS, E], repeat: SRS { keys: vec![E], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS], absorbing_except_next: vec![] });
+    assert_eq!(res[3], SM { from: vec![LS, F], to: vec![LS, U], repeat: SRS { keys: vec![U], delay_ms: 50, interval_ms: 30 }, absorbing: vec![LS], absorbing_except_next: vec![] });
     
-    assert_eq!(res[4], SM { from: vec![RS, A], to: vec![RS, A], repeat: SRS { keys: vec![A], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS]  });
-    assert_eq!(res[5], SM { from: vec![RS, S], to: vec![RS, O], repeat: SRS { keys: vec![O], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS]  });
-    assert_eq!(res[6], SM { from: vec![RS, D], to: vec![RS, E], repeat: SRS { keys: vec![E], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS]  });
-    assert_eq!(res[7], SM { from: vec![RS, F], to: vec![RS, U], repeat: SRS { keys: vec![U], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS]  });
+    assert_eq!(res[4], SM { from: vec![RS, A], to: vec![RS, A], repeat: SRS { keys: vec![A], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS], absorbing_except_next: vec![] });
+    assert_eq!(res[5], SM { from: vec![RS, S], to: vec![RS, O], repeat: SRS { keys: vec![O], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS], absorbing_except_next: vec![] });
+    assert_eq!(res[6], SM { from: vec![RS, D], to: vec![RS, E], repeat: SRS { keys: vec![E], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS], absorbing_except_next: vec![] });
+    assert_eq!(res[7], SM { from: vec![RS, F], to: vec![RS, U], repeat: SRS { keys: vec![U], delay_ms: 50, interval_ms: 30 }, absorbing: vec![RS], absorbing_except_next: vec![] });
   }
   
   #[test]
@@ -598,7 +600,7 @@ use super::{multiply, convert_row_to, convert};
       from: RFK { modifiers: vec![Alias("@shift".o())], row: f::Row::USQuertyA },
       to: RTK { initial: vec![], terminal: "A".o() },
       repeat: f::RowRepeat::Normal,
-      absorbing: vec![]
+      absorbing: Default::default()
     };
     
     use s::Mapping as SM;
@@ -607,7 +609,7 @@ use super::{multiply, convert_row_to, convert};
     
     let res = convert_row(&alias_mappings, &row).unwrap();
     assert_eq!(res.len(), 1);
-    assert_eq!(res[0], SM { from: vec![LS, A], to: vec![LS, A], repeat: s::Repeat::Normal, absorbing: vec![]  });
+    assert_eq!(res[0], SM { from: vec![LS, A], to: vec![LS, A], repeat: s::Repeat::Normal, ..Default::default() });
   }
   
   #[test]
@@ -635,7 +637,7 @@ use super::{multiply, convert_row_to, convert};
     use s::Mapping as SM;
     use KeyCode::LEFTSHIFT as LS;
     assert_eq!(simple_layout.mappings[0], SM { from: vec![LS, A], to: vec![LS, S], repeat: s::Repeat::Special {
-      keys: vec![F24], delay_ms: 180, interval_ms: 30 }, absorbing: vec![] });
+      keys: vec![F24], delay_ms: 180, interval_ms: 30 }, ..Default::default() });
   }
 
   #[test]
@@ -651,8 +653,8 @@ use super::{multiply, convert_row_to, convert};
     let simple_layout = convert(&fancy_layout).unwrap();
     assert_eq!(simple_layout.mappings.len(), 2);
     use s::Mapping as SM;
-    assert_eq!(simple_layout.mappings[0], SM { from: vec![CAPSLOCK], to: vec![], repeat: s::Repeat::Normal, absorbing: vec![] });
-    assert_eq!(simple_layout.mappings[1], SM { from: vec![CAPSLOCK, Q], to: vec![ESC], repeat: s::Repeat::Normal, absorbing: vec![] });
+    assert_eq!(simple_layout.mappings[0], SM { from: vec![CAPSLOCK], to: vec![], repeat: s::Repeat::Normal, ..Default::default() });
+    assert_eq!(simple_layout.mappings[1], SM { from: vec![CAPSLOCK, Q], to: vec![ESC], repeat: s::Repeat::Normal, ..Default::default() });
   }
 }
 

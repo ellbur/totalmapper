@@ -29,7 +29,7 @@ pub struct SingleMapping {
   pub from: SingleFromKeys,
   pub to: SingleToKeys,
   pub repeat: SingleRepeat,
-  pub absorbing: Vec<Modifier>
+  pub absorbing: Absorbing
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +43,26 @@ pub struct RowMapping {
   pub from: RowFromKeys,
   pub to: RowToKeys,
   pub repeat: RowRepeat,
-  pub absorbing: Vec<Modifier>
+  pub absorbing: Absorbing
+}
+
+/// Which modifiers a mapping "uses up" once it fires, so that they do not
+/// apply to the following keystroke.
+///
+/// `except_next` lists physical keys that, if pressed immediately after this
+/// mapping, still see the absorbed modifiers. For example, absorbing `@shift`
+/// on Shift+COMMA (`<`) with `except_next: ["DOT"]` lets Shift+COMMA, DOT type
+/// `<>` while Shift+COMMA, A types `<a`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Absorbing {
+  pub modifiers: Vec<Modifier>,
+  pub except_next: Vec<KeyCode>
+}
+
+impl Absorbing {
+  pub fn modifiers(modifiers: Vec<Modifier>) -> Absorbing {
+    Absorbing { modifiers, except_next: vec![] }
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

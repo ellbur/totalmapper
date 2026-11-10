@@ -3,7 +3,7 @@ use std::str::FromStr;
 use key_codes::KeyCode;
 use serde_json::{Value, Map};
 use Value::{Object, Array};
-use crate::{fancy_keys::{Layout, Mapping, SingleMapping, AliasMapping, RowMapping, Modifier, SingleFromKeys, RowFromKeys, SingleToKeys, RowToKeys, SingleTerminalToKey, SingleRepeat, RowRepeat, Row, AliasToKeys, AliasFromKeys, RepeatOnlySingleMapping}, key_codes};
+use crate::{fancy_keys::{Layout, Mapping, SingleMapping, AliasMapping, RowMapping, Modifier, SingleFromKeys, RowFromKeys, SingleToKeys, RowToKeys, SingleTerminalToKey, SingleRepeat, RowRepeat, Row, AliasToKeys, AliasFromKeys, RepeatOnlySingleMapping, Absorbing}, key_codes};
 use serde_json::Value as j;
 use serde_json::json;
 use lazy_static::lazy_static;
@@ -81,7 +81,7 @@ fn mapping_all_used_aliases(m: &Mapping) -> Vec<String> {
           SingleRepeat::Special { keys, delay_ms: _, interval_ms: _ } => &keys.initial,
           _ => &none
         }).iter().filter_map(just_mods))
-        .chain(single.absorbing.iter().filter_map(just_mods))
+        .chain(single.absorbing.modifiers.iter().filter_map(just_mods))
         .collect()
     },
     Mapping::Row(row) => {
@@ -91,7 +91,7 @@ fn mapping_all_used_aliases(m: &Mapping) -> Vec<String> {
           RowRepeat::Special { keys, delay_ms: _, interval_ms: _ } => &keys.initial,
           _ => &none
         }).iter().filter_map(just_mods))
-        .chain(row.absorbing.iter().filter_map(just_mods))
+        .chain(row.absorbing.modifiers.iter().filter_map(just_mods))
         .collect()
     },
     Mapping::RepeatOnlySingle(single) => {
@@ -117,7 +117,7 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
               SingleOrAliasToKeys::Single(to) => {
                 let repeat = parse_single_repeat(&mapping_values.get("repeat"))?;
                 let absorbing = parse_absorbing(&mapping_values.get("absorbing"))?;
-                for m in &absorbing {
+                for m in &absorbing.modifiers {
                   if !from.modifiers.contains(m) {
                     return Err(format!("Error in mapping {}: absorbed modifier {} does not appear on `from` side", mapping_v, m));
                   }
@@ -155,7 +155,7 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
             };
             
             let absorbing = parse_absorbing(&mapping_values.get("absorbing"))?;
-            for m in &absorbing {
+            for m in &absorbing.modifiers {
               if !from.modifiers.contains(m) {
                 return Err(format!("Error in mapping {}: absorbed modifier {} does not appear on `from` side", mapping_v, m));
               }
@@ -690,29 +690,51 @@ fn parse_repeat_interval_ms(v: &Value) -> Result<i32, String> {
   }
 }
 
-fn parse_absorbing(v: &Option<&Value>) -> Result<Vec<Modifier>, String> {
-  if let Some(v) = v {
-    if let j::Array(elems) = v {
-      let mut res = vec![];
-      for elem in elems {
-        if let j::String(elem) = elem {
-          res.push(parse_modifier(elem)?);
-        }
-        else {
-          Err(format!("`absorbing` must be a list of modifiers, found {}", elem))?;
-        }
+/// `absorbing` is one of:
+///   "@shift"                                     -- a single modifier
+///   ["@shift", "@symbol"]                        -- several modifiers
+///   {"modifiers": "@shift", "except_next": "DOT"} -- with exceptions
+/// In the object form, both fields accept a string or a list.
+fn parse_absorbing(v: &Option<&Value>) -> Result<Absorbing, String> {
+  match v {
+    None => Ok(Absorbing::default()),
+    Some(j::Object(attrs)) => {
+      if !attrs.contains_key("modifiers") || !attrs.keys().all(|k| k == "modifiers" || k == "except_next") {
+        return Err(format!("`absorbing` object must have `modifiers` and optionally `except_next`, found {}", keys_string(attrs)));
       }
-      Ok(res)
+      let modifiers = parse_absorbing_modifiers(attrs.get("modifiers").unwrap())?;
+      let except_next = match attrs.get("except_next") {
+        None => vec![],
+        Some(j::Array(elems)) => elems.iter().map(parse_key_code_j).collect::<Result<Vec<_>, _>>()?,
+        Some(other) => vec![parse_key_code_j(other)?],
+      };
+      if modifiers.is_empty() && !except_next.is_empty() {
+        return Err("`absorbing` has `except_next` but no `modifiers` to absorb".to_owned());
+      }
+      Ok(Absorbing { modifiers, except_next })
+    },
+    Some(v) => Ok(Absorbing::modifiers(parse_absorbing_modifiers(v)?))
+  }
+}
+
+fn parse_absorbing_modifiers(v: &Value) -> Result<Vec<Modifier>, String> {
+  if let j::Array(elems) = v {
+    let mut res = vec![];
+    for elem in elems {
+      if let j::String(elem) = elem {
+        res.push(parse_modifier(elem)?);
+      }
+      else {
+        Err(format!("`absorbing` must be a list of modifiers, found {}", elem))?;
+      }
     }
-    else if let j::String(elem) = v {
-      Ok(vec![parse_modifier(elem)?])
-    }
-    else {
-      Err(format!("`absorbing` must be a list of modifiers, found {}", v))
-    }
+    Ok(res)
+  }
+  else if let j::String(elem) = v {
+    Ok(vec![parse_modifier(elem)?])
   }
   else {
-    Ok(vec![])
+    Err(format!("`absorbing` must be a modifier, a list of modifiers, or an object with `modifiers`, found {}", v))
   }
 }
 
@@ -998,22 +1020,24 @@ fn format_row_repeat_special(keys: &RowToKeys, delay_ms: i32, interval_ms: i32) 
   j::Object(elems1)
 }
 
-fn format_absorbing(absorbing: &Vec<Modifier>) -> Option<Value> {
-  if absorbing.is_empty() {
+fn format_absorbing(absorbing: &Absorbing) -> Option<Value> {
+  fn one_or_many(mut elems: Vec<Value>) -> Value {
+    if elems.len() == 1 { elems.remove(0) } else { j::Array(elems) }
+  }
+
+  if absorbing.modifiers.is_empty() {
     None
   }
   else {
-    let mut res = Vec::new();
-    
-    for m in absorbing {
-      res.push(format_modifier(m));
-    }
-    
-    if res.len() == 1 {
-      Some(res.remove(0))
+    let modifiers = one_or_many(absorbing.modifiers.iter().map(format_modifier).collect());
+    if absorbing.except_next.is_empty() {
+      Some(modifiers)
     }
     else {
-      Some(j::Array(res))
+      let mut keys = Map::new();
+      keys.insert("modifiers".to_owned(), modifiers);
+      keys.insert("except_next".to_owned(), one_or_many(absorbing.except_next.iter().map(format_key_code).collect()));
+      Some(j::Object(keys))
     }
   }
 }
@@ -1062,9 +1086,9 @@ mod tests {
         Mapping::Alias(AliasMapping { from: AliasFromKeys { keys: vec![CAPSLOCK] }, to: AliasToKeys { initial: vec![], terminal: "@symbol".to_owned() } }),
         Mapping::Alias(AliasMapping { from: AliasFromKeys { keys: vec![RIGHTALT] }, to: AliasToKeys { initial: vec![], terminal: "@symbol".to_owned() } }),
       
-        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyQ }, to: RowToKeys { initial: vec![], terminal: " {}% \\*][|".to_owned() }, repeat: RowRepeat::Normal, absorbing: vec![] }),
-        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyA }, to: RowToKeys { initial: vec![], terminal: "   = &)(/_$".to_owned() }, repeat: RowRepeat::Normal, absorbing: vec![] }),
-        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyZ }, to: RowToKeys { initial: vec![], terminal: "\"    !+#".to_owned() }, repeat: RowRepeat::Normal, absorbing: vec![] }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyQ }, to: RowToKeys { initial: vec![], terminal: " {}% \\*][|".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default() }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyA }, to: RowToKeys { initial: vec![], terminal: "   = &)(/_$".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default() }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyZ }, to: RowToKeys { initial: vec![], terminal: "\"    !+#".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default() }),
       ]
     });
   }
@@ -1080,7 +1104,7 @@ mod tests {
     let parsed = parse_layout_from_json(&json).unwrap();
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: COMMA }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(W) }, repeat: SingleRepeat::Special { keys: SingleToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: SingleTerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: vec![] })
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: COMMA }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(W) }, repeat: SingleRepeat::Special { keys: SingleToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: SingleTerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: Default::default() })
       ]
     });
   }
@@ -1140,7 +1164,7 @@ mod tests {
     let parsed = parse_layout_from_json(&json).unwrap();
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: K4}, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(K3) }, repeat: SingleRepeat::Normal, absorbing: vec![] })
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: K4}, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(K3) }, repeat: SingleRepeat::Normal, absorbing: Default::default() })
       ]
     });
   }
@@ -1164,5 +1188,44 @@ mod tests {
     }
     assert_eq!(restringed1, restringed2);
   }
-}
 
+  #[test]
+  fn test_absorbing_except_next_round_trip() {
+    use crate::fancy_keys::Absorbing;
+    let text = r#"{
+      "mappings": [
+        { "from": "LEFTSHIFT", "to": "@shift" },
+        { "from": ["@shift", "COMMA"], "to": ["@shift", "COMMA"], "absorbing": {"modifiers": "@shift", "except_next": ["DOT", "SLASH"]} },
+        { "from": ["@shift", {"row": "A"}], "to": {"letters": "A"}, "absorbing": {"modifiers": ["@shift"], "except_next": "S"} }
+      ]
+    }"#;
+    let layout = parse_layout_from_json(&serde_json::from_str(text).unwrap()).unwrap();
+    match &layout.mappings[1] {
+      Mapping::Single(single) => assert_eq!(single.absorbing, Absorbing {
+        modifiers: vec![Modifier::Alias("@shift".to_owned())],
+        except_next: vec![DOT, SLASH]
+      }),
+      m => panic!("unexpected {:?}", m)
+    }
+    match &layout.mappings[2] {
+      Mapping::Row(row) => assert_eq!(row.absorbing.except_next, vec![S]),
+      m => panic!("unexpected {:?}", m)
+    }
+    let formatted = format_layout_as_json(&layout);
+    assert_eq!(parse_layout_from_json(&formatted).unwrap(), layout);
+  }
+
+  #[test]
+  fn test_absorbing_except_next_errors() {
+    let bad = [
+      r#"{"from": ["LEFTSHIFT", "COMMA"], "to": "A", "absorbing": {"except_next": "DOT"}}"#,
+      r#"{"from": ["LEFTSHIFT", "COMMA"], "to": "A", "absorbing": {"modifiers": "LEFTSHIFT", "except_next": "@shift"}}"#,
+      r#"{"from": ["LEFTSHIFT", "COMMA"], "to": "A", "absorbing": {"modifiers": "LEFTSHIFT", "unless": "DOT"}}"#,
+      r#"{"from": ["LEFTSHIFT", "COMMA"], "to": "A", "absorbing": {"modifiers": [], "except_next": "DOT"}}"#,
+    ];
+    for m in bad {
+      let text = format!(r#"{{"mappings": [{}]}}"#, m);
+      assert!(parse_layout_from_json(&serde_json::from_str(&text).unwrap()).is_err(), "should reject {}", m);
+    }
+  }
+}

@@ -34,7 +34,10 @@ struct State {
   pass_through_keys: Vec<KeyCode>,
   mapped_output_keys: Vec<KeyCode>,
   mapped_absorbed_keys: Vec<KeyCode>,
-  absorbing_trigger: Option<KeyCode>,
+  // Keys that, if pressed next, still see `mapped_absorbed_keys` as held:
+  // the key that triggered the absorbing mapping (so it can be typed
+  // repeatedly) plus that mapping's `absorbing_except_next`.
+  absorption_exempt_keys: Vec<KeyCode>,
   repeating_trigger: Option<KeyCode>
 }
 
@@ -46,7 +49,7 @@ impl State {
       pass_through_keys: Vec::new(),
       mapped_output_keys: Vec::new(),
       mapped_absorbed_keys: Vec::new(),
-      absorbing_trigger: None,
+      absorption_exempt_keys: Vec::new(),
       repeating_trigger: None,
     };
   }
@@ -210,6 +213,19 @@ fn is_any_modifier(keys: &Vec<KeyCode>) -> bool {
   keys.iter().any(|k| !is_action_key(k))
 }
 
+fn is_absorption_exempt(state: &State, k: &KeyCode) -> bool {
+  state.absorption_exempt_keys.contains(k)
+}
+
+// Called when an action key is pressed that is exempt from absorption, and
+// whose own mapping (if any) does not absorb anything. The absorbed keys
+// become ordinary held keys again: each action decides what absorption
+// follows it, and this one asked for none.
+fn forget_absorption(state: &mut State) {
+  state.mapped_absorbed_keys.clear();
+  state.absorption_exempt_keys.clear();
+}
+
 fn release_action_mappings(state: &mut State) -> Vec<Event> {
   let mut events = Vec::new();
   
@@ -263,14 +279,11 @@ fn add_new_mapping(state: &mut State, new_key: &KeyCode, m: &Mapping) -> StepRes
   
   if is_action_mapping(m) {
     events.append(&mut release_action_mappings(state));
-    let should_absorb = {
-      match &state.absorbing_trigger {
-        Some(absorbing_trigger) => *absorbing_trigger != *new_key,
-        None => true
-      }
-    };
-    if should_absorb {
+    if !is_absorption_exempt(state, new_key) {
       events.append(&mut release_absorbed_keys(state));
+    }
+    else if m.absorbing.is_empty() {
+      forget_absorption(state);
     }
   }
   
@@ -307,7 +320,9 @@ fn add_new_mapping(state: &mut State, new_key: &KeyCode, m: &Mapping) -> StepRes
     }
   }
   if m.absorbing.len() > 0 {
-    state.absorbing_trigger = Some(*new_key);
+    state.absorption_exempt_keys.clear();
+    state.absorption_exempt_keys.push(*new_key);
+    state.absorption_exempt_keys.extend(&m.absorbing_except_next);
   }
   
   state.active_mappings.push(m.clone());
@@ -376,7 +391,7 @@ fn release_absorbed_keys(state: &mut State) -> Vec<Event> {
   
   let mut to_remove: Vec<KeyCode> = Vec::new();
   to_remove.append(&mut state.mapped_absorbed_keys);
-  state.absorbing_trigger = None;
+  state.absorption_exempt_keys.clear();
   
   for k in to_remove {
     {
@@ -415,19 +430,12 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   state.repeating_trigger = None;
   
   if let Some(mappings) = mappings.get(&k) {
-    let should_absorb = {
-      match &state.absorbing_trigger {
-        Some(absorbing_trigger) => *absorbing_trigger != k,
-        None => true
-      }
-    };
-    
     let absorbed_keys = {
-      if should_absorb {
-        state.mapped_absorbed_keys.clone()
+      if is_absorption_exempt(state, &k) {
+        vec![]
       }
       else {
-        vec![]
+        state.mapped_absorbed_keys.clone()
       }
     };
     
@@ -457,7 +465,12 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     if !state.pass_through_keys.contains(&k) {
       if is_action_key(&k) {
         res.events.append(&mut release_action_mappings(&mut state));
-        res.events.append(&mut release_absorbed_keys(&mut state));
+        if is_absorption_exempt(state, &k) {
+          forget_absorption(&mut state);
+        }
+        else {
+          res.events.append(&mut release_absorbed_keys(&mut state));
+        }
       }
       
       res.events.push(Pressed(k));
@@ -782,6 +795,84 @@ mod tests {
     assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(APOSTROPHE)], mapper.step(Pressed(Z)).events);
   }
   
+  fn shift_bracket_layout(dot_absorbs: bool) -> Layout {
+    Layout {
+      mappings: vec![
+        Mapping { from: vec![LEFTSHIFT, COMMA], to: vec![LEFTSHIFT, COMMA], absorbing: vec![LEFTSHIFT], absorbing_except_next: vec![DOT], ..Default::default() },
+        Mapping { from: vec![LEFTSHIFT, DOT], to: vec![LEFTSHIFT, DOT], absorbing: if dot_absorbs { vec![LEFTSHIFT] } else { vec![] }, ..Default::default() },
+        Mapping { from: vec![LEFTSHIFT, A], to: vec![LEFTSHIFT, A], absorbing: vec![LEFTSHIFT], ..Default::default() },
+      ]
+    }
+  }
+
+  #[test]
+  fn absorbing_except_next_non_exempt_key_is_absorbed() {
+    let mut mapper = Mapper::for_layout(&shift_bracket_layout(true));
+
+    assert_eq!(vec![Pressed(LEFTSHIFT)], mapper.step(Pressed(LEFTSHIFT)).events);
+    assert_eq!(vec![Pressed(COMMA)], mapper.step(Pressed(COMMA)).events);
+    assert_eq!(vec![Released(COMMA)], mapper.step(Released(COMMA)).events);
+    // `<` then `a`
+    assert_eq!(vec![Released(LEFTSHIFT), Pressed(A)], mapper.step(Pressed(A)).events);
+  }
+
+  #[test]
+  fn absorbing_except_next_exempt_key_keeps_modifier() {
+    let mut mapper = Mapper::for_layout(&shift_bracket_layout(true));
+
+    assert_eq!(vec![Pressed(LEFTSHIFT)], mapper.step(Pressed(LEFTSHIFT)).events);
+    assert_eq!(vec![Pressed(COMMA)], mapper.step(Pressed(COMMA)).events);
+    assert_eq!(vec![Released(COMMA)], mapper.step(Released(COMMA)).events);
+    // `<` then `>`
+    assert_eq!(vec![Pressed(DOT)], mapper.step(Pressed(DOT)).events);
+    assert_eq!(vec![Released(DOT)], mapper.step(Released(DOT)).events);
+    // Shift+DOT has no exceptions of its own, so `a` is absorbed
+    assert_eq!(vec![Released(LEFTSHIFT), Pressed(A)], mapper.step(Pressed(A)).events);
+  }
+
+  #[test]
+  fn absorbing_except_next_does_not_carry_over() {
+    // The exception belongs to the Shift+COMMA mapping only; after Shift+DOT
+    // (which absorbs with no exceptions), COMMA is absorbed.
+    let mut mapper = Mapper::for_layout(&shift_bracket_layout(true));
+
+    mapper.step(Pressed(LEFTSHIFT));
+    mapper.step(Pressed(COMMA));
+    mapper.step(Released(COMMA));
+    mapper.step(Pressed(DOT));
+    mapper.step(Released(DOT));
+    assert_eq!(vec![Released(LEFTSHIFT), Pressed(COMMA)], mapper.step(Pressed(COMMA)).events);
+  }
+
+  #[test]
+  fn absorbing_except_next_into_non_absorbing_mapping() {
+    // Shift+DOT does not absorb, so after `<>` Shift is live again.
+    let mut mapper = Mapper::for_layout(&shift_bracket_layout(false));
+
+    mapper.step(Pressed(LEFTSHIFT));
+    mapper.step(Pressed(COMMA));
+    mapper.step(Released(COMMA));
+    assert_eq!(vec![Pressed(DOT)], mapper.step(Pressed(DOT)).events);
+    assert_eq!(vec![Released(DOT)], mapper.step(Released(DOT)).events);
+    assert_eq!(vec![Pressed(A)], mapper.step(Pressed(A)).events);
+  }
+
+  #[test]
+  fn absorbing_except_next_pass_through_key() {
+    // DOT has no mapping at all; it passes through, still shifted.
+    let layout = Layout {
+      mappings: vec![
+        Mapping { from: vec![LEFTSHIFT, COMMA], to: vec![LEFTSHIFT, COMMA], absorbing: vec![LEFTSHIFT], absorbing_except_next: vec![DOT], ..Default::default() },
+      ]
+    };
+    let mut mapper = Mapper::for_layout(&layout);
+
+    mapper.step(Pressed(LEFTSHIFT));
+    mapper.step(Pressed(COMMA));
+    mapper.step(Released(COMMA));
+    assert_eq!(vec![Pressed(DOT)], mapper.step(Pressed(DOT)).events);
+  }
+
   #[test]
   fn allowed_overlapping_test_1() {
     // This tests, where possible, overlapping keys are allowed.

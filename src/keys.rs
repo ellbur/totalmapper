@@ -15,7 +15,11 @@ pub struct Mapping {
   #[serde(default = "normal_repeat")]
   pub repeat: Repeat,
   #[serde(default = "Vec::new")]
-  pub absorbing: Vec<KeyCode>
+  pub absorbing: Vec<KeyCode>,
+  /// Keys that, if pressed immediately after this mapping, are exempt from
+  /// `absorbing` (the absorbed keys still count as held for them).
+  #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
+  pub absorbing_except_next: Vec<KeyCode>
 }
 
 impl Default for Mapping {
@@ -24,7 +28,8 @@ impl Default for Mapping {
       from: vec![],
       to: vec![],
       repeat: Repeat::Normal,
-      absorbing: vec![]
+      absorbing: vec![],
+      absorbing_except_next: vec![]
     }
   }
 }

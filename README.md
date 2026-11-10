@@ -340,6 +340,19 @@ If you're like me, you have a tendancy to HOld DOwn SHift TOo LOong, resulting i
 
 The `absorbing` option tells `totalmapper` that after it applies this mapping, it should "absorb" the `LEFTSHIFT` modifier so that it is not used for any subsequent keypresses.
 
+### Exceptions to absorbing
+
+Sometimes you *do* want to keep holding Shift for a particular next key, for example to type `<>` without lifting Shift. Use the object form of `absorbing` with `except_next`:
+
+```json
+{ "from": ["@shift", "COMMA"], "to": ["@shift", "COMMA"],
+  "absorbing": { "modifiers": "@shift", "except_next": ["DOT"] } }
+```
+
+With this mapping, holding Shift and typing <kbd>,</kbd> <kbd>.</kbd> gives `<>`, but <kbd>,</kbd> <kbd>A</kbd> gives `<a`. Both `modifiers` and `except_next` take a single key or a list. `except_next` names physical keys, like the last key of `from`.
+
+Exceptions only apply to the key typed *immediately* after the mapping. What happens after that is up to the mapping the next key triggers: if it has its own `absorbing`, its own exceptions apply; if it has no `absorbing`, the modifier is no longer absorbed. Pressing the same key again is always an exception, so <kbd>Shift</kbd> + <kbd>,</kbd> <kbd>,</kbd> gives `<<`.
+
 # On Chrome OS
 
 The self-contained packages will run on Intel or ARM chromebooks in developer mode. There is no need to install crouton. The binary must be copied to a filesystem that allows code execution, such as `/usr/local/bin`.
