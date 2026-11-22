@@ -84,7 +84,9 @@ pub static SUPER_DVORAK: &'static str = r#"{
     { "from": {"row": "Q"}, "to": {"letters": ";,.pyfgcrl~@"}, "repeat": "Disabled" },
     { "from": {"row": "A"}, "to": {"letters": "aoeuidhtns-"}, "repeat": "Disabled" },
     { "from": {"row": "Z"}, "to": {"letters": "'qjkxbmwvz"}, "repeat": "Disabled" },
-    { "from": ["@shift", {"row": "Q"}], "to": {"letters": ":<>PYFGCRL?^"}, "absorbing": "@shift", "repeat": "Disabled" },
+    { "from": ["@shift", {"row": "Q"}], "to": {"letters": ":  PYFGCRL?^"}, "absorbing": "@shift", "repeat": "Disabled" },
+    { "from": ["@shift", "W"], "to": ["@shift", "COMMA"], "absorbing": {"modifiers": "@shift", "except_next": "E"}, "repeat": "Disabled" },
+    { "from": ["@shift", "E"], "to": ["@shift", "DOT"], "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@shift", {"row": "A"}], "to": {"letters": "AOEUIDHTNS@"}, "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@shift", {"row": "Z"}], "to": {"letters": "\"QJKXBMWVZ"}, "absorbing": "@shift", "repeat": "Disabled" },
     { "from": ["@symbol", {"row": "Q"}], "to": {"letters": " {}% \\*][|~"}, "repeat": "Disabled" },
@@ -191,6 +193,34 @@ mod tests {
     assert_eq!(mapper.step(Pressed(LEFTSHIFT)).events, vec![Pressed(LEFTSHIFT)]);
     assert_eq!(mapper.step(Pressed(TAB)).events, vec![]);
     assert_eq!(mapper.step(Pressed(I)).events, vec![Pressed(UP)]);
+  }
+
+  fn run_super_dvorak(input: &[crate::events::Event]) -> Vec<crate::events::Event> {
+    let json = serde_json::Value::from_str(SUPER_DVORAK).unwrap();
+    let fancy_layout = parse_layout_from_json(&json).unwrap();
+    let simple_layout = crate::fancy_layout_interpreting::convert(&fancy_layout).unwrap();
+    let mut mapper = crate::key_transforms::Mapper::for_layout(&simple_layout);
+    let mut output = vec![];
+    for ev in input {
+      output.extend(mapper.step(ev.clone()).events);
+    }
+    output
+  }
+
+  #[test]
+  fn super_dvorak_angle_brackets_without_lifting_shift() {
+    use crate::events::Event::{Pressed, Released};
+    use crate::key_codes::KeyCode::*;
+    // Shift held, W then E  =>  <>
+    assert_eq!(
+      run_super_dvorak(&[Pressed(LEFTSHIFT), Pressed(W), Released(W), Pressed(E), Released(E)]),
+      vec![Pressed(LEFTSHIFT), Pressed(COMMA), Released(COMMA), Pressed(DOT), Released(DOT)]
+    );
+    // Shift held, W then P  =>  <p (shift still absorbed for other keys)
+    assert_eq!(
+      run_super_dvorak(&[Pressed(LEFTSHIFT), Pressed(W), Released(W), Pressed(R)]),
+      vec![Pressed(LEFTSHIFT), Pressed(COMMA), Released(COMMA), Released(LEFTSHIFT), Pressed(P), Released(P)]
+    );
   }
 }
 
