@@ -111,6 +111,7 @@ pub static SUPER_DVORAK: &'static str = r#"{
     { "from": ["@movement", "COMMA"], "to": ["LEFTCTRL", "RIGHT"] },
     { "from": ["@movement", "O"], "to": "TAB" },
     { "from": ["@shift", "@movement", "O"], "to": ["@shift", "TAB"] },
+    { "from": ["@movement", "P"], "to": "COMPOSE", "repeat": "Disabled" },
     { "from": ["@movement", "SPACE"], "to": "ENTER", "repeat": "Disabled", "requires_fresh": "@movement" },
     { "from": ["@shift", "@movement", "SPACE"], "to": ["@shift", "ENTER"], "repeat": "Disabled", "requires_fresh": "@movement" },
     { "from": ["@ctrl", "@movement", "SPACE"], "to": ["@ctrl", "ENTER"], "repeat": "Disabled", "requires_fresh": "@movement" },
@@ -248,6 +249,18 @@ mod tests {
       &[P(LEFTSHIFT), P(TAB), R(TAB), R(LEFTSHIFT)]);
     assert_super_dvorak(&[P(TAB), P(LEFTSHIFT), P(O), R(O), R(LEFTSHIFT), R(TAB)],
       &[P(LEFTSHIFT), P(TAB), R(TAB), R(LEFTSHIFT)]);
+  }
+
+  #[test]
+  fn super_dvorak_menu_alternative() {
+    use crate::events::Event::{Pressed, Released};
+    use crate::key_codes::KeyCode::*;
+    assert_super_dvorak(&[Pressed(TAB), Pressed(P), Released(P), Released(TAB)],
+      &[Pressed(COMPOSE), Released(COMPOSE)]);
+    // Menu does not repeat: it is released immediately even while P is held
+    assert_super_dvorak(&[Pressed(TAB), Pressed(P)], &[Pressed(COMPOSE), Released(COMPOSE)]);
+    // Plain P is still Dvorak l
+    assert_super_dvorak(&[Pressed(P), Released(P)], &[Pressed(L), Released(L)]);
   }
 
   #[test]
