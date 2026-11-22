@@ -18,6 +18,17 @@ fn is_supported(trigger: &Vec<KeyCode>, pressed_keys: &Vec<KeyCode>, absorbed_ke
   return true;
 }
 
+// A mapping's `requires_fresh` keys are fresh if every key pressed since
+// they went down belongs to the mapping's own `from`.
+fn is_fresh(pressed_since: &Vec<(KeyCode, Vec<KeyCode>)>, m: &Mapping) -> bool {
+  m.requires_fresh.iter().all(|fresh_key| {
+    match pressed_since.iter().find(|(k, _)| k == fresh_key) {
+      Some((_, since)) => since.iter().all(|k| m.from.contains(k)),
+      None => true
+    }
+  })
+}
+
 fn fails_when_released(trigger: &Vec<KeyCode>, key: &KeyCode) -> bool {
   for k in trigger {
     if k == key {
@@ -38,6 +49,9 @@ struct State {
   // the key that triggered the absorbing mapping (so it can be typed
   // repeatedly) plus that mapping's `absorbing_except_next`.
   absorption_exempt_keys: Vec<KeyCode>,
+  // For each held input key, the keys pressed after it while it was held.
+  // Used for `requires_fresh`.
+  pressed_since: Vec<(KeyCode, Vec<KeyCode>)>,
   repeating_trigger: Option<KeyCode>
 }
 
@@ -50,6 +64,7 @@ impl State {
       mapped_output_keys: Vec::new(),
       mapped_absorbed_keys: Vec::new(),
       absorption_exempt_keys: Vec::new(),
+      pressed_since: Vec::new(),
       repeating_trigger: None,
     };
   }
@@ -428,6 +443,15 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   
   state.mapped_absorbed_keys.retain(|k2| *k2 != k);
   state.repeating_trigger = None;
+
+  {
+    let input_pressed_keys = &state.input_pressed_keys;
+    state.pressed_since.retain(|(h, _)| input_pressed_keys.contains(h) && *h != k);
+    for (_, since) in state.pressed_since.iter_mut() {
+      since.push(k);
+    }
+    state.pressed_since.push((k, vec![]));
+  }
   
   if let Some(mappings) = mappings.get(&k) {
     let absorbed_keys = {
@@ -440,7 +464,7 @@ fn newly_press(mapper: &mut Mapper, k: KeyCode) -> StepResult {
     };
     
     for mapping in mappings.iter().rev() {
-      if is_supported(&mapping.from, &state.input_pressed_keys, &absorbed_keys, &k) {
+      if is_supported(&mapping.from, &state.input_pressed_keys, &absorbed_keys, &k) && is_fresh(&state.pressed_since, mapping) {
         res.append(add_new_mapping(&mut state, &k, &mapping));
         any_hit = true;
         break;
@@ -560,6 +584,7 @@ fn newly_release(mapper: &mut Mapper, k: KeyCode) -> StepResult {
   state.input_pressed_keys.retain(|&old_key| {
     old_key != k
   });
+  state.pressed_since.retain(|(h, _)| *h != k);
   
   let repeat = ResultingRepeat::Disabled;
   
@@ -903,6 +928,57 @@ mod tests {
     
     assert_eq!(vec![Pressed(LEFTSHIFT), Pressed(B)], mapper.step(Pressed(A)).events);
     assert_eq!(vec![Released(B), Released(LEFTSHIFT), Pressed(D)], mapper.step(Pressed(C)).events);
+  }
+
+  fn fresh_layout() -> Layout {
+    Layout {
+      mappings: vec![
+        Mapping { from: vec![TAB], to: vec![], ..Default::default() },
+        Mapping { from: vec![TAB, J], to: vec![LEFT], ..Default::default() },
+        Mapping { from: vec![TAB, SPACE], to: vec![ENTER], requires_fresh: vec![TAB], ..Default::default() },
+        Mapping { from: vec![LEFTSHIFT, TAB, SPACE], to: vec![LEFTSHIFT, ENTER], requires_fresh: vec![TAB], ..Default::default() },
+      ]
+    }
+  }
+
+  fn run_layout(layout: &Layout, input: &[Event]) -> Vec<Event> {
+    let mut mapper = Mapper::for_layout(layout);
+    let mut output = vec![];
+    for ev in input {
+      output.extend(mapper.step(ev.clone()).events);
+    }
+    output
+  }
+
+  #[test]
+  fn requires_fresh_applies_when_fresh() {
+    assert_eq!(run_layout(&fresh_layout(), &[Pressed(TAB), Pressed(SPACE), Released(SPACE), Released(TAB)]),
+      vec![Pressed(ENTER), Released(ENTER)]);
+  }
+
+  #[test]
+  fn requires_fresh_skipped_after_other_key() {
+    assert_eq!(run_layout(&fresh_layout(), &[Pressed(TAB), Pressed(J), Released(J), Pressed(SPACE), Released(SPACE), Released(TAB)]),
+      vec![Pressed(LEFT), Released(LEFT), Pressed(SPACE), Released(SPACE)]);
+  }
+
+  #[test]
+  fn requires_fresh_same_key_again_stays_fresh() {
+    assert_eq!(run_layout(&fresh_layout(), &[Pressed(TAB), Pressed(SPACE), Released(SPACE), Pressed(SPACE), Released(SPACE), Released(TAB)]),
+      vec![Pressed(ENTER), Released(ENTER), Pressed(ENTER), Released(ENTER)]);
+  }
+
+  #[test]
+  fn requires_fresh_allows_own_from_keys() {
+    // Shift pressed after Tab is part of the mapping's `from`, so Tab is still fresh
+    assert_eq!(run_layout(&fresh_layout(), &[Pressed(TAB), Pressed(LEFTSHIFT), Pressed(SPACE), Released(SPACE), Released(LEFTSHIFT), Released(TAB)]),
+      vec![Pressed(LEFTSHIFT), Pressed(ENTER), Released(ENTER), Released(LEFTSHIFT)]);
+  }
+
+  #[test]
+  fn requires_fresh_resets_on_repress() {
+    assert_eq!(run_layout(&fresh_layout(), &[Pressed(TAB), Pressed(J), Released(J), Released(TAB), Pressed(TAB), Pressed(SPACE), Released(SPACE), Released(TAB)]),
+      vec![Pressed(LEFT), Released(LEFT), Pressed(ENTER), Released(ENTER)]);
   }
 }
 

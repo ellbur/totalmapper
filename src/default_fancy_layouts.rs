@@ -76,6 +76,8 @@ pub static SUPER_DVORAK: &'static str = r#"{
   "mappings": [
     { "from": "LEFTSHIFT", "to": "@shift" },
     { "from": "RIGHTSHIFT", "to": "@shift" },
+    { "from": "LEFTCTRL", "to": "@ctrl" },
+    { "from": "RIGHTCTRL", "to": "@ctrl" },
     { "from": "CAPSLOCK", "to": "@symbol" },
     { "from": "RIGHTALT", "to": "@symbol" },
     { "from": "TAB", "to": "@movement" },
@@ -107,6 +109,15 @@ pub static SUPER_DVORAK: &'static str = r#"{
     { "from": ["@movement", "M"], "to": "PAGEDOWN" },
     { "from": ["@movement", "N"], "to": ["LEFTCTRL", "LEFT"] },
     { "from": ["@movement", "COMMA"], "to": ["LEFTCTRL", "RIGHT"] },
+    { "from": ["@movement", "O"], "to": "TAB" },
+    { "from": ["@shift", "@movement", "O"], "to": ["@shift", "TAB"] },
+    { "from": ["@movement", "SPACE"], "to": "ENTER", "repeat": "Disabled", "requires_fresh": "@movement" },
+    { "from": ["@shift", "@movement", "SPACE"], "to": ["@shift", "ENTER"], "repeat": "Disabled", "requires_fresh": "@movement" },
+    { "from": ["@ctrl", "@movement", "SPACE"], "to": ["@ctrl", "ENTER"], "repeat": "Disabled", "requires_fresh": "@movement" },
+    { "from": ["@symbol", "@movement", "J"], "to": "BACKSPACE" },
+    { "from": ["@symbol", "@movement", "L"], "to": "DELETE" },
+    { "from": ["@symbol", "@movement", "N"], "to": ["LEFTCTRL", "BACKSPACE"] },
+    { "from": ["@symbol", "@movement", "COMMA"], "to": ["LEFTCTRL", "DELETE"] },
     { "from": "GRAVE", "to": "LEFTMETA" },
     { "from": ["GRAVE", {"row": "1"}], "to": ["LEFTMETA", {"letters": "17531902468`"}], "repeat": "Disabled" },
     { "from": ["GRAVE", {"row": "Q"}], "to": ["LEFTMETA", {"letters": ";,.pyfgcrl~@"}], "repeat": "Disabled" },
@@ -221,6 +232,74 @@ mod tests {
       run_super_dvorak(&[Pressed(LEFTSHIFT), Pressed(W), Released(W), Pressed(R)]),
       vec![Pressed(LEFTSHIFT), Pressed(COMMA), Released(COMMA), Released(LEFTSHIFT), Pressed(P), Released(P)]
     );
+  }
+
+  fn assert_super_dvorak(input: &[crate::events::Event], expected: &[crate::events::Event]) {
+    assert_eq!(run_super_dvorak(input), expected.to_vec(), "input: {:?}", input);
+  }
+
+  #[test]
+  fn super_dvorak_tab_alternative() {
+    use crate::events::Event::{Pressed as P, Released as R};
+    use crate::key_codes::KeyCode::*;
+    assert_super_dvorak(&[P(TAB), P(O), R(O), R(TAB)], &[P(TAB), R(TAB)]);
+    // Shift+Tab, with Shift pressed before or after Tab
+    assert_super_dvorak(&[P(LEFTSHIFT), P(TAB), P(O), R(O), R(TAB), R(LEFTSHIFT)],
+      &[P(LEFTSHIFT), P(TAB), R(TAB), R(LEFTSHIFT)]);
+    assert_super_dvorak(&[P(TAB), P(LEFTSHIFT), P(O), R(O), R(LEFTSHIFT), R(TAB)],
+      &[P(LEFTSHIFT), P(TAB), R(TAB), R(LEFTSHIFT)]);
+  }
+
+  #[test]
+  fn super_dvorak_enter_alternative() {
+    use crate::events::Event::{Pressed as P, Released as R};
+    use crate::key_codes::KeyCode::*;
+    // Enter does not repeat: it is released immediately even while Space is held
+    assert_super_dvorak(&[P(TAB), P(SPACE)], &[P(ENTER), R(ENTER)]);
+    // Pressing Space again keeps Tab fresh
+    assert_super_dvorak(&[P(TAB), P(SPACE), R(SPACE), P(SPACE), R(SPACE), R(TAB)],
+      &[P(ENTER), R(ENTER), P(ENTER), R(ENTER)]);
+    // After navigating, Tab is no longer fresh, so Space is just a space
+    assert_super_dvorak(&[P(TAB), P(J), R(J), P(SPACE), R(SPACE), R(TAB)],
+      &[P(LEFT), R(LEFT), P(SPACE), R(SPACE)]);
+    assert_super_dvorak(&[P(TAB), P(SPACE), R(SPACE), P(J), R(J), P(SPACE), R(SPACE), R(TAB)],
+      &[P(ENTER), R(ENTER), P(LEFT), R(LEFT), P(SPACE), R(SPACE)]);
+    // Shift+Enter and Ctrl+Enter, with the modifier pressed before or after Tab
+    assert_super_dvorak(&[P(LEFTSHIFT), P(TAB), P(SPACE), R(SPACE), R(TAB), R(LEFTSHIFT)],
+      &[P(LEFTSHIFT), P(ENTER), R(ENTER), R(LEFTSHIFT)]);
+    assert_super_dvorak(&[P(TAB), P(RIGHTSHIFT), P(SPACE), R(SPACE), R(RIGHTSHIFT), R(TAB)],
+      &[P(RIGHTSHIFT), P(ENTER), R(ENTER), R(RIGHTSHIFT)]);
+    assert_super_dvorak(&[P(LEFTCTRL), P(TAB), P(SPACE), R(SPACE), R(TAB), R(LEFTCTRL)],
+      &[P(LEFTCTRL), P(ENTER), R(ENTER), R(LEFTCTRL)]);
+    assert_super_dvorak(&[P(TAB), P(RIGHTCTRL), P(SPACE), R(SPACE), R(RIGHTCTRL), R(TAB)],
+      &[P(RIGHTCTRL), P(ENTER), R(ENTER), R(RIGHTCTRL)]);
+    // Plain space is unaffected
+    assert_super_dvorak(&[P(SPACE), R(SPACE)], &[P(SPACE), R(SPACE)]);
+  }
+
+  #[test]
+  fn super_dvorak_delete_alternatives() {
+    use crate::events::Event::{Pressed as P, Released as R};
+    use crate::key_codes::KeyCode::*;
+    // Backspace repeats: it stays held until J is released
+    assert_super_dvorak(&[P(CAPSLOCK), P(TAB), P(J)], &[P(BACKSPACE)]);
+    assert_super_dvorak(&[P(CAPSLOCK), P(TAB), P(J), R(J), P(J), R(J), R(TAB), R(CAPSLOCK)],
+      &[P(BACKSPACE), R(BACKSPACE), P(BACKSPACE), R(BACKSPACE)]);
+    // Either order of CapsLock and Tab, or Right Alt instead of CapsLock
+    assert_super_dvorak(&[P(TAB), P(CAPSLOCK), P(J), R(J), R(CAPSLOCK), R(TAB)],
+      &[P(BACKSPACE), R(BACKSPACE)]);
+    assert_super_dvorak(&[P(RIGHTALT), P(TAB), P(J), R(J), R(TAB), R(RIGHTALT)],
+      &[P(RIGHTALT), R(RIGHTALT), P(BACKSPACE), R(BACKSPACE)]);
+    assert_super_dvorak(&[P(CAPSLOCK), P(TAB), P(L), R(L), R(TAB), R(CAPSLOCK)],
+      &[P(DELETE), R(DELETE)]);
+    assert_super_dvorak(&[P(CAPSLOCK), P(TAB), P(N), R(N), R(TAB), R(CAPSLOCK)],
+      &[P(LEFTCTRL), P(BACKSPACE), R(BACKSPACE), R(LEFTCTRL)]);
+    assert_super_dvorak(&[P(CAPSLOCK), P(TAB), P(COMMA), R(COMMA), R(TAB), R(CAPSLOCK)],
+      &[P(LEFTCTRL), P(DELETE), R(DELETE), R(LEFTCTRL)]);
+    // The movement and symbol layers on their own are unchanged
+    assert_super_dvorak(&[P(TAB), P(J), R(J), R(TAB)], &[P(LEFT), R(LEFT)]);
+    assert_super_dvorak(&[P(CAPSLOCK), P(J), R(J), R(CAPSLOCK)],
+      &[P(LEFTSHIFT), P(K0), R(K0), R(LEFTSHIFT)]);
   }
 }
 

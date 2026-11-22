@@ -82,6 +82,7 @@ fn mapping_all_used_aliases(m: &Mapping) -> Vec<String> {
           _ => &none
         }).iter().filter_map(just_mods))
         .chain(single.absorbing.modifiers.iter().filter_map(just_mods))
+        .chain(single.requires_fresh.iter().filter_map(just_mods))
         .collect()
     },
     Mapping::Row(row) => {
@@ -92,6 +93,7 @@ fn mapping_all_used_aliases(m: &Mapping) -> Vec<String> {
           _ => &none
         }).iter().filter_map(just_mods))
         .chain(row.absorbing.modifiers.iter().filter_map(just_mods))
+        .chain(row.requires_fresh.iter().filter_map(just_mods))
         .collect()
     },
     Mapping::RepeatOnlySingle(single) => {
@@ -122,14 +124,16 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
                     return Err(format!("Error in mapping {}: absorbed modifier {} does not appear on `from` side", mapping_v, m));
                   }
                 }
+                let requires_fresh = parse_requires_fresh(mapping_v, &mapping_values.get("requires_fresh"), &from.modifiers)?;
                 
                 Ok(Mapping::Single(SingleMapping {
-                  from, to, repeat, absorbing
+                  from, to, repeat, absorbing, requires_fresh
                 }))
               },
               SingleOrAliasToKeys::Alias(to) => {
                 if mapping_values.contains_key("repeat") { Err("`repeat` not allowed for alias mappings")?; }
                 if mapping_values.contains_key("absorbing") { Err("`absorbing` not allowed for alias mappings")?; }
+                if mapping_values.contains_key("requires_fresh") { Err("`requires_fresh` not allowed for alias mappings")?; }
                 Ok(Mapping::Alias(AliasMapping { from: single_to_alias_from(&from)?, to }))
               }
             }
@@ -161,8 +165,10 @@ fn parse_mapping_from_json(mapping_v: &Value) -> Result<Mapping, String> {
               }
             }
 
+            let requires_fresh = parse_requires_fresh(mapping_v, &mapping_values.get("requires_fresh"), &from.modifiers)?;
+
             Ok(Mapping::Row(RowMapping {
-              from, to, repeat, absorbing
+              from, to, repeat, absorbing, requires_fresh
             }))
           }
         }
@@ -717,6 +723,34 @@ fn parse_absorbing(v: &Option<&Value>) -> Result<Absorbing, String> {
   }
 }
 
+/// `requires_fresh` is a modifier or a list of modifiers, each of which must
+/// appear on the `from` side.
+fn parse_requires_fresh(mapping_v: &Value, v: &Option<&Value>, from_modifiers: &Vec<Modifier>) -> Result<Vec<Modifier>, String> {
+  let modifiers = match v {
+    None => vec![],
+    Some(j::String(elem)) => vec![parse_modifier(elem)?],
+    Some(j::Array(elems)) => {
+      let mut res = vec![];
+      for elem in elems {
+        if let j::String(elem) = elem {
+          res.push(parse_modifier(elem)?);
+        }
+        else {
+          Err(format!("`requires_fresh` must be a list of modifiers, found {}", elem))?;
+        }
+      }
+      res
+    },
+    Some(v) => Err(format!("`requires_fresh` must be a modifier or a list of modifiers, found {}", v))?
+  };
+  for m in &modifiers {
+    if !from_modifiers.contains(m) {
+      return Err(format!("Error in mapping {}: `requires_fresh` modifier {} does not appear on `from` side", mapping_v, m));
+    }
+  }
+  Ok(modifiers)
+}
+
 fn parse_absorbing_modifiers(v: &Value) -> Result<Vec<Modifier>, String> {
   if let j::Array(elems) = v {
     let mut res = vec![];
@@ -790,6 +824,9 @@ fn format_single_mapping(mapping: &SingleMapping) -> Value {
   if let Some(absorbing) = format_absorbing(&mapping.absorbing) {
     keys.insert("absorbing".to_owned(), absorbing);
   }
+  if let Some(requires_fresh) = format_requires_fresh(&mapping.requires_fresh) {
+    keys.insert("requires_fresh".to_owned(), requires_fresh);
+  }
   
   j::Object(keys)
 }
@@ -824,6 +861,9 @@ fn format_row_mapping(mapping: &RowMapping) -> Value {
   }
   if let Some(absorbing) = format_absorbing(&mapping.absorbing) {
     keys.insert("absorbing".to_owned(), absorbing);
+  }
+  if let Some(requires_fresh) = format_requires_fresh(&mapping.requires_fresh) {
+    keys.insert("requires_fresh".to_owned(), requires_fresh);
   }
   
   j::Object(keys)
@@ -1020,6 +1060,14 @@ fn format_row_repeat_special(keys: &RowToKeys, delay_ms: i32, interval_ms: i32) 
   j::Object(elems1)
 }
 
+fn format_requires_fresh(requires_fresh: &Vec<Modifier>) -> Option<Value> {
+  match requires_fresh.len() {
+    0 => None,
+    1 => Some(format_modifier(&requires_fresh[0])),
+    _ => Some(j::Array(requires_fresh.iter().map(format_modifier).collect()))
+  }
+}
+
 fn format_absorbing(absorbing: &Absorbing) -> Option<Value> {
   fn one_or_many(mut elems: Vec<Value>) -> Value {
     if elems.len() == 1 { elems.remove(0) } else { j::Array(elems) }
@@ -1086,9 +1134,9 @@ mod tests {
         Mapping::Alias(AliasMapping { from: AliasFromKeys { keys: vec![CAPSLOCK] }, to: AliasToKeys { initial: vec![], terminal: "@symbol".to_owned() } }),
         Mapping::Alias(AliasMapping { from: AliasFromKeys { keys: vec![RIGHTALT] }, to: AliasToKeys { initial: vec![], terminal: "@symbol".to_owned() } }),
       
-        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyQ }, to: RowToKeys { initial: vec![], terminal: " {}% \\*][|".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default() }),
-        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyA }, to: RowToKeys { initial: vec![], terminal: "   = &)(/_$".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default() }),
-        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyZ }, to: RowToKeys { initial: vec![], terminal: "\"    !+#".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default() }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyQ }, to: RowToKeys { initial: vec![], terminal: " {}% \\*][|".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default(), requires_fresh: vec![] }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyA }, to: RowToKeys { initial: vec![], terminal: "   = &)(/_$".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default(), requires_fresh: vec![] }),
+        Mapping::Row(RowMapping { from: RowFromKeys { modifiers: vec![Modifier::Alias("@symbol".to_owned())], row: USQuertyZ }, to: RowToKeys { initial: vec![], terminal: "\"    !+#".to_owned() }, repeat: RowRepeat::Normal, absorbing: Default::default(), requires_fresh: vec![] }),
       ]
     });
   }
@@ -1104,7 +1152,7 @@ mod tests {
     let parsed = parse_layout_from_json(&json).unwrap();
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: COMMA }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(W) }, repeat: SingleRepeat::Special { keys: SingleToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: SingleTerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: Default::default() })
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: COMMA }, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(W) }, repeat: SingleRepeat::Special { keys: SingleToKeys { initial: vec![Modifier::Key(LEFTCTRL)], terminal: SingleTerminalToKey::Physical(F24) }, delay_ms: 180, interval_ms: 30 }, absorbing: Default::default(), requires_fresh: vec![] })
       ]
     });
   }
@@ -1164,7 +1212,7 @@ mod tests {
     let parsed = parse_layout_from_json(&json).unwrap();
     assert_eq!(parsed, Layout {
       mappings: vec![
-        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: K4}, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(K3) }, repeat: SingleRepeat::Normal, absorbing: Default::default() })
+        Mapping::Single(SingleMapping { from: SingleFromKeys { modifiers: vec![], key: K4}, to: SingleToKeys { initial: vec![], terminal: SingleTerminalToKey::Physical(K3) }, repeat: SingleRepeat::Normal, absorbing: Default::default(), requires_fresh: vec![] })
       ]
     });
   }
@@ -1226,6 +1274,44 @@ mod tests {
     for m in bad {
       let text = format!(r#"{{"mappings": [{}]}}"#, m);
       assert!(parse_layout_from_json(&serde_json::from_str(&text).unwrap()).is_err(), "should reject {}", m);
+    }
+  }
+
+  #[test]
+  fn test_requires_fresh_round_trip() {
+    let text = r#"{
+      "mappings": [
+        { "from": "TAB", "to": "@movement" },
+        { "from": "LEFTSHIFT", "to": "@shift" },
+        { "from": ["@movement", "SPACE"], "to": "ENTER", "requires_fresh": "@movement" },
+        { "from": ["@shift", "@movement", "SPACE"], "to": ["@shift", "ENTER"], "requires_fresh": ["@shift", "@movement"] },
+        { "from": ["@movement", {"row": "A"}], "to": {"letters": "a"}, "requires_fresh": "@movement" }
+      ]
+    }"#;
+    let json = serde_json::Value::from_str(text).unwrap();
+    let layout = parse_layout_from_json(&json).unwrap();
+    match &layout.mappings[2] {
+      Mapping::Single(single) => assert_eq!(single.requires_fresh, vec![Modifier::Alias("@movement".to_owned())]),
+      other => panic!("expected single mapping, got {:?}", other)
+    }
+    match &layout.mappings[4] {
+      Mapping::Row(row) => assert_eq!(row.requires_fresh, vec![Modifier::Alias("@movement".to_owned())]),
+      other => panic!("expected row mapping, got {:?}", other)
+    }
+    assert_eq!(format_layout_as_json(&layout).to_string(), json.to_string());
+  }
+
+  #[test]
+  fn test_requires_fresh_errors() {
+    for mapping in [
+      r#"{"from": ["TAB", "SPACE"], "to": "ENTER", "requires_fresh": "LEFTSHIFT"}"#,
+      r#"{"from": ["TAB", "SPACE"], "to": "ENTER", "requires_fresh": 3}"#,
+      r#"{"from": ["TAB", "SPACE"], "to": "ENTER", "requires_fresh": [3]}"#,
+      r#"{"from": "TAB", "to": "@movement", "requires_fresh": "TAB"}"#,
+    ] {
+      let text = format!(r#"{{"mappings": [{}]}}"#, mapping);
+      let json = serde_json::Value::from_str(&text).unwrap();
+      assert!(parse_layout_from_json(&json).is_err(), "expected error for {}", mapping);
     }
   }
 }

@@ -29,7 +29,8 @@ pub struct SingleMapping {
   pub from: SingleFromKeys,
   pub to: SingleToKeys,
   pub repeat: SingleRepeat,
-  pub absorbing: Absorbing
+  pub absorbing: Absorbing,
+  pub requires_fresh: Vec<Modifier>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +44,8 @@ pub struct RowMapping {
   pub from: RowFromKeys,
   pub to: RowToKeys,
   pub repeat: RowRepeat,
-  pub absorbing: Absorbing
+  pub absorbing: Absorbing,
+  pub requires_fresh: Vec<Modifier>
 }
 
 /// Which modifiers a mapping "uses up" once it fires, so that they do not

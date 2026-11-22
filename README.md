@@ -353,6 +353,22 @@ With this mapping, holding Shift and typing <kbd>,</kbd> <kbd>.</kbd> gives `<>`
 
 Exceptions only apply to the key typed *immediately* after the mapping. What happens after that is up to the mapping the next key triggers: if it has its own `absorbing`, its own exceptions apply; if it has no `absorbing`, the modifier is no longer absorbed. Pressing the same key again is always an exception, so <kbd>Shift</kbd> + <kbd>,</kbd> <kbd>,</kbd> gives `<<`.
 
+## Requiring a fresh modifier
+
+Some chords are risky to trigger by accident. For example, if <kbd>Tab</kbd> + <kbd>Space</kbd> types Enter, you might hit Enter by mistake while navigating with <kbd>Tab</kbd> held down. To guard against that, use `requires_fresh`:
+
+```json
+{ "from": ["@movement", "SPACE"], "to": "ENTER", "requires_fresh": "@movement" }
+```
+
+A modifier is *fresh* if no other key has been pressed since it went down. The keys in the mapping's own `from` don't count, and neither does pressing the same final key again. If the modifier isn't fresh, the mapping is skipped. With the mapping above:
+
+* <kbd>Tab</kbd> + <kbd>Space</kbd> gives Enter.
+* <kbd>Tab</kbd> + <kbd>Space</kbd>, <kbd>Space</kbd> gives two Enters.
+* <kbd>Tab</kbd> + <kbd>J</kbd>, <kbd>Space</kbd> (with <kbd>Tab</kbd> still held) gives a plain space.
+
+Because only keys outside `from` count against freshness, a mapping like `["@shift", "@movement", "SPACE"]` works whether <kbd>Shift</kbd> is pressed before or after <kbd>Tab</kbd>. `requires_fresh` takes a single modifier or a list, and each one must appear in `from`.
+
 # On Chrome OS
 
 The self-contained packages will run on Intel or ARM chromebooks in developer mode. There is no need to install crouton. The binary must be copied to a filesystem that allows code execution, such as `/usr/local/bin`.

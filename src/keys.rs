@@ -19,7 +19,13 @@ pub struct Mapping {
   /// Keys that, if pressed immediately after this mapping, are exempt from
   /// `absorbing` (the absorbed keys still count as held for them).
   #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
-  pub absorbing_except_next: Vec<KeyCode>
+  pub absorbing_except_next: Vec<KeyCode>,
+  /// Modifiers that must be "fresh" for this mapping to apply: no key other
+  /// than this mapping's own `from` keys may have been pressed since the
+  /// modifier went down. Otherwise the mapping is skipped as if the modifier
+  /// were not held.
+  #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
+  pub requires_fresh: Vec<KeyCode>
 }
 
 impl Default for Mapping {
@@ -29,7 +35,8 @@ impl Default for Mapping {
       to: vec![],
       repeat: Repeat::Normal,
       absorbing: vec![],
-      absorbing_except_next: vec![]
+      absorbing_except_next: vec![],
+      requires_fresh: vec![]
     }
   }
 }
